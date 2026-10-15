@@ -6,7 +6,7 @@ import { createNodeDatabase } from '@/services/database/testing/nodeDatabase';
 
 import { DAY_MS } from './domain/fsrs';
 import { answerStep, currentStep, isComplete } from './domain/session';
-import { loadDashboard, prepareSession } from './learningService';
+import { loadDashboard, loadProgressOverview, prepareSession } from './learningService';
 
 const NOW = new Date(2026, 4, 12, 9, 0).getTime();
 const profile: UserProfile = {
@@ -63,6 +63,28 @@ describe('learning service', () => {
     const reviewed = review.state.steps.filter((s) => s.reason === 'due').map((s) => s.itemId);
     expect(reviewed.length).toBeGreaterThan(0);
     expect(reviewed.every((id) => newIds.includes(id))).toBe(true);
+    db.close();
+  });
+
+  it('summarises the week, level totals and the most difficult items', async () => {
+    const { db, repos } = await setup();
+    // Fail one word repeatedly across days so it becomes difficult.
+    for (let day = 0; day < 4; day++) {
+      await repos.progress.recordReview({
+        itemId: 'en-vocab-ambiguous',
+        itemType: 'vocabulary',
+        exerciseType: 'meaning',
+        outcome: { kind: 'quiz', correct: false, responseMs: 3000 },
+        context: 'session',
+        now: NOW - (3 - day) * DAY_MS,
+      });
+    }
+    const overview = await loadProgressOverview(repos, profile, NOW);
+    expect(overview.week).toHaveLength(7);
+    expect(overview.weekTotals).toMatchObject({ interactions: 4, incorrect: 4 });
+    expect(overview.difficultItems).toEqual([{ id: 'en-vocab-ambiguous', label: 'ambiguous' }]);
+    expect(overview.levels.map((l) => l.level)).toEqual(['B1', 'B2', 'C1']);
+    expect(overview.streak.current).toBe(4);
     db.close();
   });
 });

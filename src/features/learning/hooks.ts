@@ -6,7 +6,7 @@ import { useRepositories } from '@/hooks/useRepositories';
 import { useToday } from '@/hooks/useToday';
 import type { RecordReviewInput } from '@/repositories/progressRepository';
 
-import { loadDashboard, loadWeek } from './learningService';
+import { loadDashboard, loadProgressOverview, loadWeek } from './learningService';
 
 export function useDashboard() {
   const repos = useRepositories();
@@ -50,4 +50,15 @@ export function useRecordReview() {
 export function useInvalidateLearning() {
   const client = useQueryClient();
   return () => client.invalidateQueries({ queryKey: queryKeys.learning });
+}
+
+export function useProgressOverview() {
+  const repos = useRepositories();
+  const today = useToday();
+  const profile = useProfile().data;
+  return useQuery({
+    queryKey: queryKeys.progress(today),
+    enabled: !!profile,
+    queryFn: () => loadProgressOverview(repos, profile!, Date.now()),
+  });
 }

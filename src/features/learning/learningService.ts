@@ -1,4 +1,5 @@
 import type { Repositories } from '@/repositories';
+import type { LevelTotals } from '@/repositories/contentRepository';
 import type { AppSettings, UserProfile } from '@/features/settings/schema';
 import type { LearningItem, LearningStatus } from '@/types/learning';
 import { type DateKey, addDays, toDateKey } from '@/utils/date';
@@ -8,7 +9,7 @@ import { computeLevelPolicy, type LevelPolicy } from './domain/levelPolicy';
 import { buildQueue, countDue, type QueueCandidate } from './domain/queue';
 import { effectiveStatus } from './domain/review';
 import { createSession, type SessionState } from './domain/session';
-import { computeStreak, type DailyActivity, type StreakInfo } from './domain/stats';
+import { computeStreak, type DailyActivity, type StreakInfo, sumActivity } from './domain/stats';
 import { generateQuiz } from './domain/exercises';
 import { createRng } from '@/utils/random';
 
@@ -140,4 +141,50 @@ export interface WeekSummary {
 export async function loadWeek(repos: Repositories, now: number): Promise<WeekSummary> {
   const today = toDateKey(now);
   return { days: await repos.activity.getRange(addDays(today, -6), today) };
+}
+
+export interface ProgressOverview {
+  week: DailyActivity[];
+  weekTotals: ReturnType<typeof sumActivity>;
+  statusCounts: Record<LearningStatus, number>;
+  streak: StreakInfo;
+  levels: LevelTotals[];
+  difficultItems: { id: string; label: string }[];
+}
+
+function itemLabel(item: LearningItem): string {
+  if (item.type === 'vocabulary') return item.word;
+  if (item.type === 'phrase') return item.phrase;
+  return item.rule;
+}
+
+export async function loadProgressOverview(
+  repos: Repositories,
+  profile: UserProfile,
+  now: number,
+): Promise<ProgressOverview> {
+  const today = toDateKey(now);
+  const [week, candidates, streak, levels] = await Promise.all([
+    repos.activity.getRange(addDays(today, -6), today),
+    repos.progress.getQueueCandidates(profile.targetLanguage),
+    getStreak(repos, today),
+    repos.content.levelTotals(profile.targetLanguage),
+  ]);
+  const difficultIds = candidates
+    .filter((c) => effectiveStatus(c.progress?.status ?? 'new', c.personal) === 'difficult')
+    .sort((a, b) => (b.progress?.lapses ?? 0) - (a.progress?.lapses ?? 0))
+    .slice(0, 8)
+    .map((c) => c.itemId);
+  const difficultItems = (await repos.content.getItems(difficultIds)).map((item) => ({
+    id: item.id,
+    label: itemLabel(item),
+  }));
+  return {
+    week,
+    weekTotals: sumActivity(week),
+    statusCounts: countStatuses(candidates),
+    streak,
+    levels,
+    difficultItems,
+  };
 }

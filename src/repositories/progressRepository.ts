@@ -157,7 +157,6 @@ export function createProgressRepository(db: Database, activity: ActivityReposit
             newItems: review.wasNew ? 1 : 0,
             reviews: review.wasNew ? 0 : 1,
             grammarAnswered: input.itemType === 'grammar' && input.exerciseType !== 'intro' ? 1 : 0,
-            unlockCardsShown: input.context === 'unlock' ? 1 : 0,
           },
           input.now,
         );

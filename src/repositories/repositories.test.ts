@@ -70,7 +70,7 @@ describe('progress repository', () => {
       interactions: 2,
       incorrect: 1,
       grammarAnswered: 1,
-      unlockCardsShown: 1,
+      unlockCardsShown: 0, // counted from native "shown" events, not answers
     });
     expect((await repos.progress.getLastExerciseTypes(['en-vocab-resilient'])).get('en-vocab-resilient')).toBe('meaning');
     close();

@@ -1,0 +1,7 @@
+{
+  "name": "alarm-clock",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Local Expo module: exact alarms, ringing service and lock-screen challenge for Unlock Lingo (Android).",
+  "main": "src/index.ts"
+}

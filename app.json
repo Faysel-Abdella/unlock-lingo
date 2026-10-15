@@ -42,6 +42,12 @@
         }
       ],
       [
+        "expo-notifications",
+        {
+          "color": "#0F766E"
+        }
+      ],
+      [
         "expo-speech-recognition",
         {
           "microphonePermission": "Unlock Lingo uses the microphone only while you practise saying a word.",

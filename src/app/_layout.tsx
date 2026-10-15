@@ -12,6 +12,7 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 import { AlarmRuntime } from '@/features/alarms/AlarmRuntime';
 import { useProfile, useSettings } from '@/features/settings/hooks';
+import { WeeklyReminderRuntime } from '@/features/reviews/WeeklyReminderRuntime';
 import { UnlockRuntime } from '@/features/unlock/UnlockRuntime';
 import { RepositoriesProvider } from '@/hooks/useRepositories';
 import { DatabaseProvider } from '@/services/database/DatabaseProvider';
@@ -68,6 +69,7 @@ function Navigator() {
       <StatusBar style={scheme === 'dark' ? 'light' : 'dark'} />
       <AlarmRuntime />
       <UnlockRuntime />
+      <WeeklyReminderRuntime />
       <Stack
         screenOptions={{
           headerShadowVisible: false,

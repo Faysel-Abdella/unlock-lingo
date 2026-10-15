@@ -27,7 +27,7 @@ The full plan, Android risk analysis and schema rationale are in
 ## Tech stack
 
 Expo SDK 57 (development build, **not** Expo Go) · React Native 0.86 · TypeScript (strict) ·
-Expo Router · expo-sqlite · TanStack Query · Zod · expo-speech · Jest · a local Expo module in
+Expo Router · expo-sqlite · TanStack Query · Zod · expo-speech · expo-notifications · Jest · a local Expo module in
 Kotlin (`modules/alarm-clock`, `modules/unlock-cards`). Zustand is in the stack plan for lightweight client state, but
 nothing needs it yet.
 
@@ -186,6 +186,17 @@ imports.
   week being summarised.
 - **Snapshots.** Completing the quiz saves the week to `weekly_stats`, so it isn't offered again
   and appears in Progress → Weekly reviews with its accuracy trend.
+- **Reminder (opt-in).** Settings → Remind me on review day schedules one notification (via
+  `expo-notifications`) on the review day at 9:00, 12:00, 18:00 or 20:00. It's only scheduled
+  when the week already has learning and its review isn't done. It re-syncs on launch, on resume,
+  after settings changes and after new activity. Tapping it opens the weekly review.
+
+### Progress
+
+- Activity for the last 7 days or the last 12 calendar weeks (Monday-based), with moments,
+  accuracy and active days.
+- Accuracy per CEFR level over the last 30 days, and what smart difficulty is currently doing.
+- Weekly review history with the accuracy trend against the previous week.
 
 ### Audio
 
@@ -254,7 +265,7 @@ optionally through an `AIContentProvider` later. Until then it is reviewed as a 
 | `RECORD_AUDIO` | expo-speech-recognition | Only while you practise saying a word (opt-in). Requested when you turn on speaking practice. |
 | `INTERNET` | Expo | Development client only (connecting to Metro). The app itself works offline. |
 | `VIBRATE` | expo-haptics, alarm module | Haptic feedback; alarm vibration |
-| `POST_NOTIFICATIONS` | alarm, unlock-cards modules | Alarms and learning cards are notifications. Requested at runtime (Android 13+) when you save an alarm or turn on unlock learning. |
+| `POST_NOTIFICATIONS` | alarm, unlock-cards modules, expo-notifications | Alarms, learning cards and the weekly reminder are notifications. Requested at runtime (Android 13+) when you save an alarm, turn on unlock learning or turn on the weekly reminder. |
 | `SCHEDULE_EXACT_ALARM` | alarm module | Ring at the exact minute. Android 14+ denies it by default for new installs, so the app shows a shortcut to grant it. |
 | `USE_FULL_SCREEN_INTENT` | alarm module | Show the challenge over the lock screen. Users can revoke it on Android 14+; the app shows a shortcut. |
 | `RECEIVE_BOOT_COMPLETED` | alarm, unlock-cards modules | Re-schedule alarms and restore card delivery after a reboot |
@@ -415,9 +426,8 @@ classes. Card delivery still has to be checked on a device:
   own files (needs a document picker and persisted URI permissions).
 - **Phase 3 follow-ups:** device testing (checklist above), a home-screen widget as a further
   low-interruption option, and Listen directly from the notification.
-- **Phase 4 follow-ups:** prerecorded audio for seed content, a weekly-review reminder
-  notification, charts over longer periods, and offering the offline speech model download
-  (`androidTriggerOfflineModelDownload`) from settings.
+- **Phase 4 follow-ups:** prerecorded audio for seed content, and offering the offline speech
+  model download (`androidTriggerOfflineModelDownload`) from settings.
 - **Phase 5:** concrete `AIContentProvider` implementations: enrich My Words, write
   interest-tailored examples, generate exercises, explain mistakes. Always optional and
   replaceable.

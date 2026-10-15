@@ -53,6 +53,19 @@ describe('weekly review service', () => {
     const session = await prepareWeeklySession(repos, profile, review.quizItemIds);
     expect(session.state.steps.every((s) => s.mode === 'quiz')).toBe(true);
 
+    // Answering the weekly quiz itself does not change the week it summarises.
+    await repos.progress.recordReview({
+      itemId: 'en-vocab-ambiguous',
+      itemType: 'vocabulary',
+      exerciseType: 'meaning',
+      outcome: quiz(true),
+      context: 'weekly',
+      now: at(15, 20),
+    });
+    const during = await loadWeeklyReview(repos, profile, DEFAULT_SETTINGS, at(15, 21));
+    const { activeDays: _a, streak: _s, ...counts } = review.stats;
+    expect(during.stats).toMatchObject(counts);
+
     await completeWeeklyReview(repos, review.stats, { questions: 4, correct: 3 }, at(15, 21));
     const after = await loadWeeklyReview(repos, profile, DEFAULT_SETTINGS, at(16));
     expect(after.due).toBe(false);

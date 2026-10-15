@@ -29,7 +29,7 @@ export interface WeekAnswerRow extends WeekAnswer {
 }
 
 export interface WeeklyRepository {
-  /** Every answer in [from, to] (epoch ms), oldest first. */
+  /** Every answer in [from, to] (epoch ms), oldest first, excluding the weekly quiz itself. */
   answersBetween(language: LanguageCode, from: number, to: number): Promise<WeekAnswerRow[]>;
   getSnapshot(weekStart: DateKey): Promise<WeeklySnapshot | null>;
   saveSnapshot(snapshot: WeeklySnapshot, now: number): Promise<void>;
@@ -58,7 +58,7 @@ export function createWeeklyRepository(db: Database): WeeklyRepository {
          FROM review_history rh
          JOIN learning_items li ON li.id = rh.item_id
          LEFT JOIN learning_progress lp ON lp.item_id = rh.item_id
-         WHERE li.language = ? AND rh.reviewed_at BETWEEN ? AND ?
+         WHERE li.language = ? AND rh.reviewed_at BETWEEN ? AND ? AND rh.context <> 'weekly'
          ORDER BY rh.reviewed_at, rh.id`,
         [language, from, to],
       );

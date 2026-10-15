@@ -7,6 +7,7 @@ import { Button, Card, ListGroup, ListRow, Screen, SectionHeader, SegmentedProgr
 import { describeRepeat, describeTimeUntil, formatAlarmTime } from '@/features/alarms/domain/schedule';
 import { useNextAlarm } from '@/features/alarms/hooks';
 import { useDashboard } from '@/features/learning/hooks';
+import { useWeeklyReview } from '@/features/reviews/hooks';
 import { useProfile, useSaveProfile, useSettings } from '@/features/settings/hooks';
 import { useTheme } from '@/theme/ThemeProvider';
 
@@ -24,6 +25,7 @@ export default function Dashboard() {
   const saveProfile = useSaveProfile();
   const [now] = useState(Date.now);
   const nextAlarm = useNextAlarm(now);
+  const weekly = useWeeklyReview().data;
 
   if (!data) return <Screen>{null}</Screen>;
 
@@ -86,6 +88,21 @@ export default function Dashboard() {
           onPress={() => router.push('/session')}
         />
       </View>
+
+      {weekly?.due ? (
+        <Card tone="accent" onPress={() => router.push('/weekly-review')} accessibilityLabel="Open your weekly review">
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.md }}>
+            <Ionicons name="calendar" size={22} color={colors.accent} accessibilityElementsHidden importantForAccessibility="no" />
+            <View style={{ flex: 1, gap: 2 }}>
+              <Text variant="bodyStrong">Your weekly review is ready</Text>
+              <Text variant="caption" tone="muted">
+                {weekly.stats.wordsEncountered} words this week · 5–10 minutes
+              </Text>
+            </View>
+            <Ionicons name="chevron-forward" size={18} color={colors.accent} accessibilityElementsHidden importantForAccessibility="no" />
+          </View>
+        </Card>
+      ) : null}
 
       <StatGrid
         stats={[

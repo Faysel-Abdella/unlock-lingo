@@ -1,0 +1,40 @@
+{
+  "expo": {
+    "name": "Unlock Lingo",
+    "slug": "unlock-lingo",
+    "scheme": "unlocklingo",
+    "version": "0.1.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "automatic",
+    "backgroundColor": "#F7F6F2",
+    "android": {
+      "package": "com.unlocklingo.app",
+      "adaptiveIcon": {
+        "backgroundColor": "#1F2A24",
+        "foregroundImage": "./assets/android-icon-foreground.png",
+        "backgroundImage": "./assets/android-icon-background.png",
+        "monochromeImage": "./assets/android-icon-monochrome.png"
+      },
+      "predictiveBackGestureEnabled": false,
+      "permissions": []
+    },
+    "ios": {
+      "supportsTablet": false,
+      "bundleIdentifier": "com.unlocklingo.app"
+    },
+    "plugins": [
+      "expo-router",
+      "expo-sqlite",
+      [
+        "expo-splash-screen",
+        {
+          "image": "./assets/splash-icon.png",
+          "imageWidth": 160,
+          "backgroundColor": "#F7F6F2",
+          "dark": { "backgroundColor": "#121413" }
+        }
+      ]
+    ]
+  }
+}

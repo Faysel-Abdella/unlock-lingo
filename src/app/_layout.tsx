@@ -1,4 +1,9 @@
+import { DMSans_400Regular } from '@expo-google-fonts/dm-sans/400Regular';
+import { DMSans_500Medium } from '@expo-google-fonts/dm-sans/500Medium';
+import { DMSans_600SemiBold } from '@expo-google-fonts/dm-sans/600SemiBold';
+import { DMSans_700Bold } from '@expo-google-fonts/dm-sans/700Bold';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { useFonts } from 'expo-font';
 import { Stack } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
@@ -40,7 +45,9 @@ export default function RootLayout() {
 function AppShell() {
   const settings = useSettings();
   const profile = useProfile();
-  const ready = !settings.isPending && !profile.isPending;
+  const [fontsLoaded, fontError] = useFonts({ DMSans_400Regular, DMSans_500Medium, DMSans_600SemiBold, DMSans_700Bold });
+  // A font failure falls back to the system font rather than blocking the app.
+  const ready = !settings.isPending && !profile.isPending && (fontsLoaded || !!fontError);
 
   useEffect(() => {
     if (ready) void SplashScreen.hideAsync();

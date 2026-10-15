@@ -159,6 +159,20 @@ describe('buildQueue new-item selection', () => {
     );
     expect(queue.map((e) => e.itemId)).toEqual(['mine', 'b1-software', 'b1-plain', 'b2']);
   });
+
+  it('mixes vocabulary, phrases and grammar even when one type ranks higher', () => {
+    // Easy, interest-matching grammar would otherwise take every slot.
+    const grammar = Array.from({ length: 8 }, (_, i) =>
+      candidate(`g${i}`, null, { type: 'grammar', contentDifficulty: 2, tags: ['general'] }),
+    );
+    const vocab = Array.from({ length: 8 }, (_, i) => candidate(`v${i}`, null, { contentDifficulty: 5 }));
+    const phrases = Array.from({ length: 4 }, (_, i) => candidate(`p${i}`, null, { type: 'phrase', contentDifficulty: 5 }));
+    const queue = buildQueue([...grammar, ...vocab, ...phrases], opts({ size: 10, interests: ['general'] }));
+    const types = queue.map((e) => e.itemId[0]);
+    expect(types.filter((t) => t === 'v')).toHaveLength(6);
+    expect(types.filter((t) => t === 'p')).toHaveLength(2);
+    expect(types.filter((t) => t === 'g')).toHaveLength(2);
+  });
 });
 
 describe('countDue', () => {

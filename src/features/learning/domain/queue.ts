@@ -46,6 +46,15 @@ export interface QueueOptions {
 export const DEFAULT_MAX_NEW_RATIO = 0.3;
 export const DEFAULT_BACKLOG_LIMIT = 15;
 export const DEFAULT_EXTRA_PRACTICE_GAP_MS = 4 * 60 * 60 * 1000;
+/**
+ * Share of new items per type. Without it, ranking by interest and content
+ * difficulty lets one type (e.g. easy, broadly tagged grammar) fill every slot.
+ */
+export const NEW_TYPE_SHARES: Readonly<Record<LearningItemType, number>> = {
+  vocabulary: 0.6,
+  phrase: 0.2,
+  grammar: 0.2,
+};
 
 function isNew(c: QueueCandidate): boolean {
   return c.progress === null || c.progress.reps === 0;
@@ -188,48 +197,78 @@ export function buildQueue(candidates: readonly QueueCandidate[], opts: QueueOpt
   const newTake = Math.min(newAllowance, size - reviewTake);
 
   const reviews = reviewPool.slice(0, reviewTake);
-  const orderedFresh = opts.levelShares ? mixByLevel(fresh, opts.levelShares) : fresh;
+  const typeMixed = mixTypesWithinLevels(fresh);
+  const orderedFresh = opts.levelShares ? mixByLevel(typeMixed, opts.levelShares) : typeMixed;
   const news = orderedFresh.slice(0, newTake).map((c) => ({ itemId: c.itemId, reason: 'new' as const }));
   return interleave(reviews, news);
 }
 
 /**
+ * Reorders items so each key appears in proportion to its share, keeping the
+ * order within each key: every slot goes to the key furthest behind its share
+ * (largest-deficit rounding). Items whose key has no share are dropped.
+ */
+function mixByShare<T, K extends string>(
+  items: readonly T[],
+  keyOf: (item: T) => K,
+  shares: Partial<Record<K, number>>,
+): T[] {
+  const pools = new Map<K, T[]>();
+  for (const item of items) {
+    const key = keyOf(item);
+    if (!(shares[key] ?? 0)) continue;
+    pools.set(key, [...(pools.get(key) ?? []), item]);
+  }
+  const taken = new Map<K, number>();
+  const result: T[] = [];
+  const total = [...pools.values()].reduce((n, p) => n + p.length, 0);
+  for (let k = 1; result.length < total; k++) {
+    let best: K | null = null;
+    let bestDeficit = -Infinity;
+    for (const [key, pool] of pools) {
+      const used = taken.get(key) ?? 0;
+      if (used >= pool.length) continue;
+      const deficit = (shares[key] ?? 0) * k - used;
+      if (deficit > bestDeficit) {
+        bestDeficit = deficit;
+        best = key;
+      }
+    }
+    if (best === null) break;
+    const used = taken.get(best) ?? 0;
+    result.push((pools.get(best) as T[])[used] as T);
+    taken.set(best, used + 1);
+  }
+  return result;
+}
+
+/**
+ * Mixes item types (mostly vocabulary, some phrases and grammar) within each
+ * level, keeping personal words first and levels in their ranked order.
+ */
+export function mixTypesWithinLevels(fresh: readonly QueueCandidate[]): QueueCandidate[] {
+  const personal = fresh.filter((c) => c.personal !== null);
+  const byLevel = new Map<CefrLevel, QueueCandidate[]>();
+  for (const c of fresh) {
+    if (c.personal !== null) continue;
+    byLevel.set(c.cefrLevel, [...(byLevel.get(c.cefrLevel) ?? []), c]);
+  }
+  const mixed = [...byLevel.values()].flatMap((pool) => mixByShare(pool, (c) => c.type, NEW_TYPE_SHARES));
+  return [...personal, ...mixed];
+}
+
+/**
  * Reorders new items so levels appear in proportion to their share: personal
- * words stay first, then each slot goes to the level furthest behind its share
- * (largest-deficit rounding), keeping each level's internal order.
+ * words stay first, then each slot goes to the level furthest behind its share,
+ * keeping each level's internal order.
  */
 export function mixByLevel(
   fresh: readonly QueueCandidate[],
   shares: Partial<Record<CefrLevel, number>>,
 ): QueueCandidate[] {
   const personal = fresh.filter((c) => c.personal !== null);
-  const pools = new Map<CefrLevel, QueueCandidate[]>();
-  for (const c of fresh) {
-    if (c.personal !== null) continue;
-    if (!(shares[c.cefrLevel] ?? 0)) continue;
-    pools.set(c.cefrLevel, [...(pools.get(c.cefrLevel) ?? []), c]);
-  }
-  const taken = new Map<CefrLevel, number>();
-  const result: QueueCandidate[] = [];
-  const total = [...pools.values()].reduce((n, p) => n + p.length, 0);
-  for (let k = 1; result.length < total; k++) {
-    let best: CefrLevel | null = null;
-    let bestDeficit = -Infinity;
-    for (const [level, pool] of pools) {
-      const used = taken.get(level) ?? 0;
-      if (used >= pool.length) continue;
-      const deficit = (shares[level] ?? 0) * k - used;
-      if (deficit > bestDeficit) {
-        bestDeficit = deficit;
-        best = level;
-      }
-    }
-    if (best === null) break;
-    const used = taken.get(best) ?? 0;
-    result.push((pools.get(best) as QueueCandidate[])[used] as QueueCandidate);
-    taken.set(best, used + 1);
-  }
-  return [...personal, ...result];
+  const seed = fresh.filter((c) => c.personal === null);
+  return [...personal, ...mixByShare(seed, (c) => c.cefrLevel, shares)];
 }
 
 /** Number of reviews currently due, used for dashboard counts and backlog gating. */

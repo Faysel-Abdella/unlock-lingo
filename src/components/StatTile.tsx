@@ -4,7 +4,13 @@ import { useTheme } from '@/theme/ThemeProvider';
 
 import { Text } from './Text';
 
-export function StatTile({ label, value, hint }: { label: string; value: string; hint?: string }) {
+export interface Stat {
+  label: string;
+  value: string;
+  hint?: string;
+}
+
+export function StatTile({ label, value, hint }: Stat) {
   const { colors, radius, spacing } = useTheme();
   return (
     <View
@@ -21,6 +27,14 @@ export function StatTile({ label, value, hint }: { label: string; value: string;
         gap: spacing.xs,
       }}
     >
+      <StatContent label={label} value={value} hint={hint} />
+    </View>
+  );
+}
+
+function StatContent({ label, value, hint }: Stat) {
+  return (
+    <>
       <Text variant="label" tone="subtle">
         {label}
       </Text>
@@ -30,6 +44,40 @@ export function StatTile({ label, value, hint }: { label: string; value: string;
           {hint}
         </Text>
       ) : null}
+    </>
+  );
+}
+
+/** Swiss grid: stats in two columns separated by hairlines, inside one surface. */
+export function StatGrid({ stats }: { stats: Stat[] }) {
+  const { colors, radius, spacing } = useTheme();
+  const rows: Stat[][] = [];
+  for (let i = 0; i < stats.length; i += 2) rows.push(stats.slice(i, i + 2));
+  return (
+    <View style={{ borderWidth: 1, borderColor: colors.border, borderRadius: radius.lg, backgroundColor: colors.surface }}>
+      {rows.map((row, r) => (
+        <View
+          key={r}
+          style={{ flexDirection: 'row', borderTopWidth: r === 0 ? 0 : 1, borderTopColor: colors.border }}
+        >
+          {row.map((stat, c) => (
+            <View
+              key={stat.label}
+              accessible
+              accessibilityLabel={`${stat.label}: ${stat.value}${stat.hint ? `, ${stat.hint}` : ''}`}
+              style={{
+                flex: 1,
+                padding: spacing.lg,
+                gap: spacing.xs,
+                borderLeftWidth: c === 0 ? 0 : 1,
+                borderLeftColor: colors.border,
+              }}
+            >
+              <StatContent {...stat} />
+            </View>
+          ))}
+        </View>
+      ))}
     </View>
   );
 }

@@ -15,7 +15,7 @@ const TABS: { name: string; title: string; icon: IconName; iconActive: IconName 
 ];
 
 export default function TabsLayout() {
-  const { colors } = useTheme();
+  const { colors, fonts } = useTheme();
   return (
     <Tabs
       screenOptions={{
@@ -38,7 +38,7 @@ export default function TabsLayout() {
           options={{
             title: tab.title,
             tabBarLabel: ({ color }) => (
-              <Text style={{ color, fontSize: 11, lineHeight: 15, fontWeight: '600' }}>
+              <Text style={{ color, fontFamily: fonts.semibold, fontSize: 11, lineHeight: 15 }}>
                 {tab.title}
               </Text>
             ),

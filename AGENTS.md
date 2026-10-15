@@ -11,3 +11,10 @@ Expo SDK 57 development build (not Expo Go), TypeScript strict, Expo Router in `
 - `/android` is generated. Configure native behaviour through `app.json` or config plugins.
 - No `any`. Validate untrusted data (JSON columns, settings) with Zod.
 - Before declaring work done, run `npm run check` (typecheck, lint, tests).
+
+## Branches
+
+Name branches `<type>/<short-kebab-description>` after the work they contain, never after a
+tool or session. Types: `feature`, `fix`, `docs`, `chore`, `refactor`, `test`. Examples:
+`feature/learning-engine`, `feature/alarms`, `feature/unlock-cards`, `fix/queue-ordering`.
+One branch per phase or coherent change; commit after each significant step.

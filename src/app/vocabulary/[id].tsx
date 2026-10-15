@@ -28,6 +28,7 @@ export default function ItemDetail() {
   }
 
   const { item, progress, personal } = data;
+  const spoken = item.type === 'vocabulary' ? item.word : item.type === 'phrase' ? item.phrase : null;
   const translation = item.type === 'vocabulary' && nativeLanguage ? item.translations[nativeLanguage] : undefined;
 
   return (
@@ -35,12 +36,8 @@ export default function ItemDetail() {
       <LearningCard
         item={item}
         actions={{
-          onListen:
-            item.type === 'vocabulary'
-              ? () => speak(item.word)
-              : item.type === 'phrase'
-                ? () => speak(item.phrase)
-                : undefined,
+          onListen: spoken ? () => speak(spoken) : undefined,
+          onListenSlow: spoken ? () => speak(spoken, { slow: true }) : undefined,
           onSave: item.type === 'vocabulary' ? () => addWord.mutate({ word: item.word }) : undefined,
           saved: !!personal,
         }}

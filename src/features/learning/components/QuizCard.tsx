@@ -2,7 +2,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useEffect, useState } from 'react';
 import { Pressable, View } from 'react-native';
 
-import { Button, Text } from '@/components';
+import { Button, IconButton, Text } from '@/components';
 import { type ChoiceQuestion, isAnswerCorrect } from '@/features/learning/domain/exercises';
 import { useTheme } from '@/theme/ThemeProvider';
 import { createStopwatch } from '@/utils/date';
@@ -12,6 +12,7 @@ interface QuizCardProps {
   onAnswer: (correct: boolean, responseMs: number) => void;
   onContinue: () => void;
   onListen?: (text: string) => void;
+  onListenSlow?: (text: string) => void;
   autoPlay?: boolean;
 }
 
@@ -23,7 +24,7 @@ function subjectVariant(subject: string): 'display' | 'title' | 'heading' {
 }
 
 /** One multiple-choice question: a single tap answers, a second tap continues. */
-export function QuizCard({ question, onAnswer, onContinue, onListen, autoPlay }: QuizCardProps) {
+export function QuizCard({ question, onAnswer, onContinue, onListen, onListenSlow, autoPlay }: QuizCardProps) {
   const { colors, radius, spacing } = useTheme();
   const [selected, setSelected] = useState<number | null>(null);
   const [stopwatch] = useState(createStopwatch);
@@ -77,6 +78,11 @@ export function QuizCard({ question, onAnswer, onContinue, onListen, autoPlay }:
         >
           <Ionicons name="volume-high" size={36} color={colors.accent} />
         </Pressable>
+      ) : null}
+      {question.audioText && onListenSlow ? (
+        <View style={{ alignSelf: 'center' }}>
+          <IconButton icon="speedometer-outline" label="Play slowly" onPress={() => onListenSlow(question.audioText ?? '')} />
+        </View>
       ) : null}
 
       <View style={{ gap: spacing.sm }}>

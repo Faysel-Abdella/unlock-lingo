@@ -97,6 +97,7 @@ function CardBody({ item, saved: initiallySaved }: { item: LearningItem; saved: 
           item={item}
           actions={{
             onListen: spoken ? () => speak(spoken) : undefined,
+            onListenSlow: spoken ? () => speak(spoken, { slow: true }) : undefined,
             onKnow: () => selfGrade(true),
             onReviewLater: () => selfGrade(false),
             onSave:

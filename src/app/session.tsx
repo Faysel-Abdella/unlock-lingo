@@ -119,6 +119,7 @@ export default function SessionScreen() {
   if (!question || !item || !step) return null;
   const text = spokenText(item);
   const listen = text ? () => speak(text) : undefined;
+  const listenSlow = text ? () => speak(text, { slow: true }) : undefined;
   const save =
     item.type === 'vocabulary' ? () => void session.toggleSave(item.id, item.word) : undefined;
 
@@ -137,6 +138,7 @@ export default function SessionScreen() {
             item={item}
             actions={{
               onListen: listen,
+              onListenSlow: listenSlow,
               onSave: save,
               saved: session.savedIds.has(item.id),
               onKnow: () => void answerCard(true),
@@ -151,6 +153,7 @@ export default function SessionScreen() {
             question={question}
             autoPlay={autoPlay}
             onListen={speak}
+            onListenSlow={(text) => speak(text, { slow: true })}
             onAnswer={(correct, responseMs) => {
               void Haptics.notificationAsync(
                 correct ? Haptics.NotificationFeedbackType.Success : Haptics.NotificationFeedbackType.Error,

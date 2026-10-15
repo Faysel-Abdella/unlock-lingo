@@ -6,7 +6,7 @@ Unlock Lingo is an Android-first app for learning a language without scheduling 
 It attaches tiny learning moments to two habits you already have:
 
 1. **Waking up.** Turning off the alarm takes a short micro-challenge.
-2. **Unlocking your phone.** A small, rate-limited learning card appears now and then (Phase 3).
+2. **Unlocking your phone.** A small, rate-limited learning card appears now and then.
 
 Most moments take under 15 seconds. A local spaced-repetition engine (FSRS-5) decides what you
 see, so reviews of older material always come before new words. Everything works offline.
@@ -17,7 +17,7 @@ see, so reviews of older material always come before new words. Everything works
 | ----- | ----- | ----- |
 | 1 | Project setup, navigation, SQLite and migrations, content schema and seed data, FSRS engine, vocabulary cards, My Words, progress tracking, dashboard, onboarding, settings | ✅ Done |
 | 2 | Alarm creation, `AlarmManager` integration, full-screen alarm, learning challenge, reliable dismissal | ✅ Built; needs device testing (see [Alarm test checklist](#alarm-test-checklist)) |
-| 3 | Unlock detection, interruption policy (cap, cooldown, quiet/work hours), notification fallback | Planned |
+| 3 | Unlock detection, interruption policy (cap, cooldown, quiet/work hours), notification fallback | ✅ Built; needs device testing (see [Unlock card test checklist](#unlock-card-test-checklist)) |
 | 4 | Weekly review, analytics snapshots, richer adaptive difficulty, audio improvements | Planned |
 | 5 | Optional AI personalisation | Planned |
 
@@ -28,7 +28,7 @@ The full plan, Android risk analysis and schema rationale are in
 
 Expo SDK 57 (development build, **not** Expo Go) · React Native 0.86 · TypeScript (strict) ·
 Expo Router · expo-sqlite · TanStack Query · Zod · expo-speech · Jest · a local Expo module in
-Kotlin (`modules/alarm-clock`). Zustand is in the stack plan for lightweight client state, but
+Kotlin (`modules/alarm-clock`, `modules/unlock-cards`). Zustand is in the stack plan for lightweight client state, but
 nothing needs it yet.
 
 ## Getting started
@@ -56,9 +56,9 @@ npm test               # jest: domain logic plus repositories on real SQLite
 npm run check          # all three
 ```
 
-The alarm module's pure scheduling logic (`AlarmSpec.kt`) has JVM unit tests mirroring the
-TypeScript ones. Run them from a generated project with
-`cd android && ./gradlew :alarm-clock:testDebugUnitTest`.
+The native modules' pure logic (`AlarmSpec.kt`, `CardPolicy.kt`) has JVM unit tests mirroring
+the TypeScript ones. Run them from a generated project with
+`cd android && ./gradlew :alarm-clock:testDebugUnitTest :unlock-cards:testDebugUnitTest`.
 
 Repository and migration tests run against Node's built-in `node:sqlite`, through the same
 `Database` interface that `expo-sqlite` satisfies. That means SQL is exercised in CI without a
@@ -76,6 +76,8 @@ src/
     words/                add word + personal word detail
     alarms/               alarm list + editor
     alarm/ring.tsx        ringing challenge (deep link unlocklingo://alarm/ring?alarmId=…)
+    unlock-settings.tsx   unlock learning settings (deep link unlocklingo://unlock-settings)
+    card.tsx              full card opened from a card notification (unlocklingo://card?itemId=…)
   components/             design-system primitives (Text, Card, Button, Chip, …)
   theme/                  tokens (colors, spacing, radius, typography, shadows) + ThemeProvider
   features/
@@ -83,6 +85,8 @@ src/
     learning/             learningService (orchestration), hooks, session hook, cards
     alarms/domain/        PURE TS: next occurrence (DST-safe), snooze policy, challenge state machine
     alarms/               alarmService (sync, native event import, challenge content), hooks, screens' logic
+    unlock/domain/        PURE TS: interruption policy (cap, cooldown, quiet/work hours, frequency), settings
+    unlock/               unlockService (card deck, native sync, event import), hooks
     vocabulary/ settings/ onboarding/ progress/   feature hooks and components
   repositories/           SQL lives here only. One repository per aggregate, plus row mappers
   services/
@@ -95,6 +99,7 @@ src/
   utils/                  dates, seeded RNG
 modules/
   alarm-clock/            local Expo module (Android, Kotlin): scheduler, receivers, ringing service
+  unlock-cards/           local Expo module (Android, Kotlin): unlock listener, scheduled cards, card notifications
 ```
 
 Dependency direction: `app → features (hooks) → learningService → repositories → Database`,
@@ -168,10 +173,11 @@ optionally through an `AIContentProvider` later. Until then it is reviewed as a 
 | ---------- | ----------- | --- |
 | `INTERNET` | Expo | Development client only (connecting to Metro). The app itself works offline. |
 | `VIBRATE` | expo-haptics, alarm module | Haptic feedback; alarm vibration |
-| `POST_NOTIFICATIONS` | alarm module | The ringing alarm is a notification. Requested at runtime (Android 13+) when an alarm is saved. |
+| `POST_NOTIFICATIONS` | alarm, unlock-cards modules | Alarms and learning cards are notifications. Requested at runtime (Android 13+) when you save an alarm or turn on unlock learning. |
 | `SCHEDULE_EXACT_ALARM` | alarm module | Ring at the exact minute. Android 14+ denies it by default for new installs, so the app shows a shortcut to grant it. |
 | `USE_FULL_SCREEN_INTENT` | alarm module | Show the challenge over the lock screen. Users can revoke it on Android 14+; the app shows a shortcut. |
-| `RECEIVE_BOOT_COMPLETED` | alarm module | Re-schedule alarms after a reboot |
+| `RECEIVE_BOOT_COMPLETED` | alarm, unlock-cards modules | Re-schedule alarms and restore card delivery after a reboot |
+| `FOREGROUND_SERVICE_SPECIAL_USE` | unlock-cards module | Only while "after I unlock" is on: the listener that notices unlocks (see below) |
 | `FOREGROUND_SERVICE`, `FOREGROUND_SERVICE_MEDIA_PLAYBACK` | alarm module | Keep the alarm sound playing until it is dismissed |
 | `WAKE_LOCK` | alarm module | Keep the CPU awake while the alarm rings |
 
@@ -250,28 +256,77 @@ framework classes. Ringing behaviour still has to be checked on a real device (A
 - [ ] With exact alarms denied, the app warns the user and the alarm still fires (possibly late)
 - [ ] `alarm_history` shows the right dismissal method for each case
 
-## Unlock cards: Android limitations
+## Unlock cards
 
-- `ACTION_USER_PRESENT` (unlock) **cannot** be received by a manifest receiver since Android 8.
-  Only a running process with a runtime-registered receiver gets it.
-- Starting an activity from the background is blocked since Android 10. "Show a screen right
-  after unlock" isn't possible without hacks.
-- **Planned approach.** An *opt-in* foreground service, with a persistent quiet notification,
-  listens for unlocks. It checks the interruption policy (daily cap, cooldown, quiet hours, work
-  hours, frequency) and posts a heads-up **notification card** with the word and quick actions.
-  Tapping it opens the full card.
-- **Fallback.** No persistent service: cards are scheduled across the day using the same policy.
-- **Not used:** accessibility services, overlay windows, `UsageStatsManager` polling. They are
-  fragile, hostile to users, or against Play policy.
-- Cards never appear after every unlock unless the user explicitly asks for that.
+Off until the learner turns it on. Defaults: up to 10 cards a day, at least 30 minutes apart,
+quiet hours 23:00–07:00.
+
+### What Android allows
+
+- `ACTION_USER_PRESENT` (the unlock broadcast) **cannot** be received by a manifest receiver
+  since Android 8. Only a running process that registered for it at runtime gets it.
+- Opening an activity from the background is blocked since Android 10, so the app can't show a
+  screen right after an unlock. Only fragile workarounds exist: overlay windows,
+  accessibility-service abuse, or polling usage stats. The app uses **none** of them.
+- The closest reliable experience is a **notification card** that appears right after an unlock.
+
+### How it works (`modules/unlock-cards`)
+
+- **"After I unlock" mode.** An opt-in foreground service registers for `USER_PRESENT` at
+  runtime. Android requires such a service to show a small ongoing notification; it is silent
+  and minimised, and tapping it opens the settings. No standard service type fits, so it uses
+  `specialUse` with a declared reason. A Play release needs a justification in the Play Console.
+- **"Spread through the day" mode** (fallback). No persistent service. Inexact, Doze-friendly
+  `AlarmManager` slots spread cards evenly across the active part of the day.
+- **Decision.** Every time, `CardPolicy.kt` (the Kotlin mirror of
+  `src/features/unlock/domain/policy.ts`, unit-tested with the same cases) checks:
+  - unlock learning is on;
+  - the daily cap;
+  - the cooldown;
+  - quiet hours (also across midnight);
+  - work hours on chosen days;
+  - frequency.
+
+  "A card after every unlock" is an explicit opt-in that skips cooldown and frequency only.
+- **Content.** JS prepares a deck of up to 30 cards with the session priorities (due →
+  difficult → failed → rationed new) and the chosen card types, so native code never needs
+  JS to show one.
+- **Interaction.** The card is a silent heads-up notification:
+  - word, pronunciation, meaning and example;
+  - actions *I know this*, *Review later* and *Save*;
+  - tap to open the full card with *Listen* and *Dismiss*;
+  - grammar cards open a quick question in the app;
+  - swiping a card away is a dismissal and leaves progress unchanged.
+- **Data.** Native code logs `shown`, `answered`, `saved` and `dismissed`. On launch and
+  foreground, JS imports them:
+  - answers become self-graded reviews with `context = 'unlock'`;
+  - saved words go to My Words;
+  - shown cards are counted per day.
+- **Survival.** Delivery is restored after reboot, app update and clock changes. If Android
+  refuses a foreground start, the module backs off instead of crashing.
+
+### Unlock card test checklist
+
+`CardPolicy.kt` is unit-tested, and the Android code compiles against the Android 14 framework
+classes. Card delivery still has to be checked on a device:
+
+- [ ] Turning it on asks for notifications; the persistent "Unlock learning is on" notification appears ("after I unlock" mode only)
+- [ ] A card appears shortly after unlocking; no second card within the cooldown
+- [ ] No cards during quiet hours (also after midnight) or work hours on work days
+- [ ] The daily maximum stops cards; it resets the next day
+- [ ] *I know this* / *Review later* / *Save* work from the notification and show up in the app afterwards
+- [ ] Tapping a card opens the full card; *Listen* speaks the word
+- [ ] Swiping a card away changes no progress
+- [ ] "Spread through the day" mode delivers cards without the persistent notification
+- [ ] Delivery resumes after reboot; turning unlock learning off stops everything
+- [ ] OEM battery savers (Samsung, Xiaomi): check whether the listener survives a day
 
 ## Roadmap
 
 - **Phase 2 follow-ups:** device testing (checklist above), custom alarm sounds, a gradual
   volume ramp, and a wheel-style time picker.
-- **Phase 3 (unlock cards):** a pure interruption policy (cap, cooldown, quiet/work hours) with
-  tests, the unlock listener service, notification cards, importing native-side answers into
-  SQLite.
+- **Phase 3 follow-ups:** device testing (checklist above), a home-screen widget as a further
+  low-interruption option, and Listen directly from the notification.
 - **Phase 4:** weekly review (default Sunday, configurable): a summary plus a 5–10 minute quiz
   focused on difficult and recent items. Also `weekly_stats` snapshots, richer analytics,
   prerecorded audio, and a pronunciation exercise using speech recognition.

@@ -1,0 +1,7 @@
+{
+  "name": "unlock-cards",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Local Expo module: opt-in unlock and scheduled learning cards for Unlock Lingo (Android).",
+  "main": "src/index.ts"
+}

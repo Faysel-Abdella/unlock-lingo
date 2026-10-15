@@ -16,4 +16,5 @@ export const queryKeys = {
   alarms: ['alarms'] as const,
   alarm: (id: string) => ['alarms', id] as const,
   alarmPermissions: ['alarmPermissions'] as const,
+  unlockStatus: ['unlockStatus'] as const,
 };

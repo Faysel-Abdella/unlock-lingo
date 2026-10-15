@@ -8,6 +8,7 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 import { AlarmRuntime } from '@/features/alarms/AlarmRuntime';
 import { useProfile, useSettings } from '@/features/settings/hooks';
+import { UnlockRuntime } from '@/features/unlock/UnlockRuntime';
 import { RepositoriesProvider } from '@/hooks/useRepositories';
 import { DATABASE_NAME, initializeDatabase } from '@/services/database/initialize';
 import { ThemeProvider, useTheme } from '@/theme/ThemeProvider';
@@ -62,6 +63,7 @@ function Navigator() {
     <>
       <StatusBar style={scheme === 'dark' ? 'light' : 'dark'} />
       <AlarmRuntime />
+      <UnlockRuntime />
       <Stack
         screenOptions={{
           headerShadowVisible: false,
@@ -81,6 +83,8 @@ function Navigator() {
         <Stack.Screen name="words/[id]" options={{ title: '' }} />
         <Stack.Screen name="alarms/index" options={{ title: 'Alarms' }} />
         <Stack.Screen name="alarms/[id]" options={{ title: 'Alarm' }} />
+        <Stack.Screen name="unlock-settings" options={{ title: 'Unlock learning' }} />
+        <Stack.Screen name="card" options={{ title: '', presentation: 'modal' }} />
         <Stack.Screen name="alarm/ring" options={{ headerShown: false, gestureEnabled: false, animation: 'fade' }} />
       </Stack>
     </>

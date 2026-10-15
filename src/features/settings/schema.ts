@@ -1,5 +1,6 @@
 import { z } from 'zod';
 
+import { DEFAULT_UNLOCK_SETTINGS, unlockSettingsSchema } from '@/features/unlock/domain/settings';
 import { cefrLevelSchema, interestSchema, languageCodeSchema } from '@/types/language';
 
 /** Each field falls back to its default if stored data is missing or invalid. */
@@ -20,6 +21,8 @@ export const appSettingsSchema = z.object({
   autoPlayAudio: setting(z.boolean(), false),
   /** 0 = Sunday … 6 = Saturday. */
   weeklyReviewDay: setting(z.number().int().min(0).max(6), 0),
+  /** Unlock learning cards. Falls back to safe defaults (off) if stored data is invalid. */
+  unlock: setting(unlockSettingsSchema, DEFAULT_UNLOCK_SETTINGS),
 });
 
 export type AppSettings = z.infer<typeof appSettingsSchema>;

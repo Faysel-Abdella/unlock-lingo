@@ -70,7 +70,7 @@ describe('progress repository', () => {
       interactions: 2,
       incorrect: 1,
       grammarAnswered: 1,
-      unlockCardsShown: 1,
+      unlockCardsShown: 0, // counted from native "shown" events, not answers
     });
     expect((await repos.progress.getLastExerciseTypes(['en-vocab-resilient'])).get('en-vocab-resilient')).toBe('meaning');
     close();
@@ -201,6 +201,23 @@ describe('activity repository', () => {
     const range = await repos.activity.getRange('2026-05-09', '2026-05-12');
     expect(range.map((d) => d.interactions)).toEqual([0, 2, 0, 1]);
     expect(await repos.activity.getActiveDays()).toEqual(['2026-05-12', '2026-05-10']);
+    close();
+  });
+});
+
+describe('unlock settings', () => {
+  it('defaults to off and falls back to defaults when stored data is invalid', async () => {
+    const { repos, close } = await setup();
+    const settings = await repos.profile.getSettings();
+    expect(settings.unlock).toMatchObject({ enabled: false, maxCardsPerDay: 10, cooldownMinutes: 30 });
+
+    const next = await repos.profile.updateSettings({ unlock: { ...settings.unlock, enabled: true, maxCardsPerDay: 5 } });
+    expect(next.unlock).toMatchObject({ enabled: true, maxCardsPerDay: 5 });
+    expect((await repos.profile.getSettings()).unlock.maxCardsPerDay).toBe(5);
+
+    // A corrupt value (here: 0 card types and 999 cards) never reaches the policy.
+    const corrupt = { ...next.unlock, maxCardsPerDay: 999, cardTypes: [] };
+    expect((await repos.profile.updateSettings({ unlock: corrupt })).unlock).toMatchObject({ enabled: false, maxCardsPerDay: 10 });
     close();
   });
 });

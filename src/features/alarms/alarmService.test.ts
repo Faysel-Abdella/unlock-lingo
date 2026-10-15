@@ -51,7 +51,9 @@ describe('alarm sync', () => {
     const alarm = await repos.alarms.create({ ...ALARM_DEFAULTS, days: [1, 7] }, NOW);
     const bridge = fakeBridge();
     const next = await syncAlarms(repos, bridge);
-    expect(bridge.synced).toEqual([expect.objectContaining({ id: alarm.id, daysMask: 0b1000001, enabled: true })]);
+    expect(bridge.synced).toEqual([
+      expect.objectContaining({ id: alarm.id, daysMask: 0b1000001, enabled: true, soundUri: null, gradualVolume: true }),
+    ]);
     expect(next[alarm.id]).toBe(NOW + 60_000);
     db.close();
   });

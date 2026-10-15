@@ -27,7 +27,7 @@ The full plan, Android risk analysis and schema rationale are in
 ## Tech stack
 
 Expo SDK 57 (development build, **not** Expo Go) · React Native 0.86 · TypeScript (strict) ·
-Expo Router · expo-sqlite · TanStack Query · Zod · expo-speech · Jest · a local Expo module in
+Expo Router · expo-sqlite · TanStack Query · Zod · expo-speech · expo-notifications · Jest · a local Expo module in
 Kotlin (`modules/alarm-clock`, `modules/unlock-cards`). Zustand is in the stack plan for lightweight client state, but
 nothing needs it yet.
 
@@ -103,13 +103,14 @@ src/
     unlock/               unlockService (card deck, native sync, event import), hooks
     reviews/domain/       PURE TS: review week window, weekly stats, weekly quiz selection
     reviews/              weeklyService (load, prepare quiz, save snapshot), hooks
-    audio/domain/         PURE TS: TTS voice selection, slow rate
+    audio/domain/         PURE TS: TTS voice selection, slow rate, pronunciation scoring
+    audio/                pronunciation practice service, hook and SpeakCard
     progress/domain/      PURE TS: weekly trends, level-mix description, smart-difficulty status
     vocabulary/ settings/ onboarding/ progress/   feature hooks and components
   repositories/           SQL lives here only. One repository per aggregate, plus row mappers
   services/
     database/             Database interface, migrations, versioned seed content, test adapter
-    audio/                PronunciationService (TTS with best-voice selection), SpeechRecognitionProvider (null for now)
+    audio/                PronunciationService (TTS with best-voice selection), SpeechRecognitionProvider (expo-speech-recognition)
     ai/                   AIContentProvider interface + offline default
   native/                 typed bridges to native modules, with no-op fallbacks
   hooks/                  repositories context, query keys, pronunciation, date
@@ -185,6 +186,17 @@ imports.
   week being summarised.
 - **Snapshots.** Completing the quiz saves the week to `weekly_stats`, so it isn't offered again
   and appears in Progress → Weekly reviews with its accuracy trend.
+- **Reminder (opt-in).** Settings → Remind me on review day schedules one notification (via
+  `expo-notifications`) on the review day at 9:00, 12:00, 18:00 or 20:00. It's only scheduled
+  when the week already has learning and its review isn't done. It re-syncs on launch, on resume,
+  after settings changes and after new activity. Tapping it opens the weekly review.
+
+### Progress
+
+- Activity for the last 7 days or the last 12 calendar weeks (Monday-based), with moments,
+  accuracy and active days.
+- Accuracy per CEFR level over the last 30 days, and what smart difficulty is currently doing.
+- Weekly review history with the accuracy trend against the previous week.
 
 ### Audio
 
@@ -192,8 +204,28 @@ imports.
   quality, then offline voices ahead of network ones. The choice is cached per locale.
 - "Listen slowly" replays at 60% of your speech rate (minimum 0.4) on cards and listening
   questions.
-- `SpeechRecognitionProvider` defines the interface for future pronunciation practice. The
-  default implementation reports itself as unavailable.
+
+### Speaking practice
+
+Opt-in under Settings → Audio, because it needs the microphone.
+
+- **In sessions.** Up to three "Say it out loud" steps per daily session, each right after an
+  item's first quiz. Only words and phrases of up to five words qualify. You get up to three
+  attempts, with Listen and Listen slowly. Speaking steps never re-queue an item or count as
+  missed.
+- **Anywhere.** Word detail screens have "Practise saying it".
+- **Scoring.** Recogniser hypotheses are compared with the target text, ignoring case, accents
+  and punctuation, and accepting the target inside a longer utterance. An exact match is
+  "clear"; ≥ 75% similarity (edit distance) is "close", usually recognition noise; anything
+  else is "unclear" and shows what was heard. The recogniser is not biased towards the expected
+  word, so a mispronunciation isn't silently corrected into a match.
+- **Practice only.** Attempts are stored in `pronunciation_attempts`, separate from FSRS history,
+  and never change when a word comes back: recognisers mishear accents and noisy rooms.
+  Progress shows how many attempts were understood and which words to practise again.
+- **Engine.** `expo-speech-recognition` uses Android's `SpeechRecognizer`, on-device when that
+  language's offline model is installed (otherwise the system recogniser, which may use the
+  network). The provider sits behind `SpeechRecognitionProvider`, with a null implementation
+  for devices without a recogniser.
 
 ## Database schema
 
@@ -212,6 +244,8 @@ a new one.
 | `review_history` | Every answer with exercise type, rating, response time, context (`session`, `unlock`, `alarm`, `weekly`) and before/after scheduling state |
 | `personal_vocabulary` | My Words: links to a learning item, plus context note, source and important/difficult/mastered flags, and enrichment status |
 | `daily_activity` | Per-day counters: interactions, correct, incorrect, new, reviews, grammar, unlock cards, alarm challenges |
+| `alarms` (migration 3) | Adds `sound_uri`, `sound_title` (null = system default) and `gradual_volume` |
+| `pronunciation_attempts` | Speaking practice: expected text, what was heard, similarity and verdict (migration 2). Never affects scheduling. |
 | `weekly_stats` | One snapshot per completed weekly review (JSON, validated with Zod), keyed by week start |
 | `alarms` / `alarm_history` | Alarm definitions, and every ring: fired time, snoozes, how it was dismissed (`challenge`, `emergency`, `timeout`), questions answered/correct |
 
@@ -228,9 +262,10 @@ optionally through an `AIContentProvider` later. Until then it is reviewed as a 
 
 | Permission | Declared by | Why |
 | ---------- | ----------- | --- |
+| `RECORD_AUDIO` | expo-speech-recognition | Only while you practise saying a word (opt-in). Requested when you turn on speaking practice. |
 | `INTERNET` | Expo | Development client only (connecting to Metro). The app itself works offline. |
 | `VIBRATE` | expo-haptics, alarm module | Haptic feedback; alarm vibration |
-| `POST_NOTIFICATIONS` | alarm, unlock-cards modules | Alarms and learning cards are notifications. Requested at runtime (Android 13+) when you save an alarm or turn on unlock learning. |
+| `POST_NOTIFICATIONS` | alarm, unlock-cards modules, expo-notifications | Alarms, learning cards and the weekly reminder are notifications. Requested at runtime (Android 13+) when you save an alarm, turn on unlock learning or turn on the weekly reminder. |
 | `SCHEDULE_EXACT_ALARM` | alarm module | Ring at the exact minute. Android 14+ denies it by default for new installs, so the app shows a shortcut to grant it. |
 | `USE_FULL_SCREEN_INTENT` | alarm module | Show the challenge over the lock screen. Users can revoke it on Android 14+; the app shows a shortcut. |
 | `RECEIVE_BOOT_COMPLETED` | alarm, unlock-cards modules | Re-schedule alarms and restore card delivery after a reboot |
@@ -264,7 +299,10 @@ stays generated.
    (`AlarmSchedule.nextOccurrence` mirrors the TS function and has its own unit tests). A
    one-time alarm disables itself.
 3. **Ring.** `AlarmRingingService` is a foreground service of type `mediaPlayback`:
-   - plays the default alarm sound on the alarm stream (looping), vibrates and holds a wake lock;
+   - plays the alarm's sound on the alarm stream (looping): the one chosen in the editor, or the
+     system default if none was chosen or it can't be played. With gradual volume (on by default)
+     it starts at 15% and rises along a quadratic curve to full volume over 60 s. It also vibrates
+     and holds a wake lock;
    - posts a high-priority notification whose full-screen intent opens
      `unlocklingo://alarm/ring?alarmId=…`.
 
@@ -312,6 +350,10 @@ framework classes. Ringing behaviour still has to be checked on a real device (A
 - [ ] A one-time alarm turns itself off after ringing, and the app shows it as off
 - [ ] With exact alarms denied, the app warns the user and the alarm still fires (possibly late)
 - [ ] `alarm_history` shows the right dismissal method for each case
+- [ ] A chosen sound plays; deleting that ringtone falls back to the default sound
+- [ ] Gradual volume starts quiet and reaches full volume after about a minute; off = full at once
+- [ ] Sound preview in the editor stops when you leave the editor
+- [ ] The wheel time picker snaps to a value after a fling, and TalkBack adjusts it by swiping up and down
 
 ## Unlock cards
 
@@ -380,13 +422,12 @@ classes. Card delivery still has to be checked on a device:
 
 ## Roadmap
 
-- **Phase 2 follow-ups:** device testing (checklist above), custom alarm sounds, a gradual
-  volume ramp, and a wheel-style time picker.
+- **Phase 2 follow-ups:** device testing (checklist above), and custom sounds from the user's
+  own files (needs a document picker and persisted URI permissions).
 - **Phase 3 follow-ups:** device testing (checklist above), a home-screen widget as a further
   low-interruption option, and Listen directly from the notification.
-- **Phase 4 follow-ups:** prerecorded audio for seed content, a pronunciation exercise built on
-  an on-device `SpeechRecognitionProvider`, a weekly-review reminder notification, and charts
-  over longer periods.
+- **Phase 4 follow-ups:** prerecorded audio for seed content, and offering the offline speech
+  model download (`androidTriggerOfflineModelDownload`) from settings.
 - **Phase 5:** concrete `AIContentProvider` implementations: enrich My Words, write
   interest-tailored examples, generate exercises, explain mistakes. Always optional and
   replaceable.

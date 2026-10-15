@@ -3,6 +3,7 @@ import { useState } from 'react';
 import { Alert, View } from 'react-native';
 
 import { Button, Card, Chip, EmptyState, Screen, Text, TextField } from '@/components';
+import { PracticeSpeaking } from '@/features/audio/components/PracticeSpeaking';
 import { LearningCard } from '@/features/learning/components/LearningCard';
 import { useItem } from '@/features/learning/hooks';
 import { useProfile } from '@/features/settings/hooks';
@@ -59,6 +60,7 @@ function WordDetail({ word }: { word: PersonalWord }) {
   return (
     <Screen edges={[]}>
       <LearningCard item={word.item} actions={{ onListen: () => speak(word.word), onListenSlow: () => speak(word.word, { slow: true }) }} />
+      <PracticeSpeaking item={word.item} />
 
       <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm }}>
         <Chip label="★ Important" selected={word.flags.isImportant} onPress={() => toggle('isImportant')} />

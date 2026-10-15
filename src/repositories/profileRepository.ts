@@ -96,6 +96,7 @@ export function createProfileRepository(db: Database): ProfileRepository {
           DELETE FROM review_history;
           DELETE FROM daily_activity;
           DELETE FROM weekly_stats;
+          DELETE FROM pronunciation_attempts;
         `);
       });
     },

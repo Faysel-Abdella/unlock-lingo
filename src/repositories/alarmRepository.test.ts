@@ -1,5 +1,5 @@
 import { ALARM_DEFAULTS } from '@/features/alarms/domain/types';
-import { runMigrations } from '@/services/database/migrations';
+import { MIGRATIONS, runMigrations } from '@/services/database/migrations';
 import { createNodeDatabase } from '@/services/database/testing/nodeDatabase';
 
 import { createAlarmRepository } from './alarmRepository';
@@ -28,6 +28,29 @@ describe('alarm repository', () => {
 
     await alarms.remove(early.id);
     expect(await alarms.list()).toHaveLength(1);
+    db.close();
+  });
+
+  it('stores the chosen sound and gradual volume', async () => {
+    const { db, alarms } = await setup();
+    const sound = { uri: 'content://media/internal/audio/media/42', title: 'Morning Glory' };
+    const alarm = await alarms.create({ ...ALARM_DEFAULTS, sound, gradualVolume: false }, NOW);
+    expect(alarm).toMatchObject({ sound, gradualVolume: false });
+    const reset = await alarms.update(alarm.id, { ...alarm, sound: null, gradualVolume: true }, NOW + 1);
+    expect(reset).toMatchObject({ sound: null, gradualVolume: true });
+    db.close();
+  });
+
+  it('keeps existing alarms on the default sound with gradual volume after the upgrade', async () => {
+    const db = createNodeDatabase();
+    await runMigrations(db, MIGRATIONS.filter((m) => m.version < 3));
+    await db.runAsync(
+      `INSERT INTO alarms (id, label, hour, minute, days_mask, enabled, created_at, updated_at)
+       VALUES ('old', 'Before', 7, 0, 31, 1, ?, ?)`,
+      [NOW, NOW],
+    );
+    await runMigrations(db);
+    expect(await createAlarmRepository(db).get('old')).toMatchObject({ label: 'Before', sound: null, gradualVolume: true });
     db.close();
   });
 

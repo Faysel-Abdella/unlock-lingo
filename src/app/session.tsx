@@ -3,6 +3,9 @@ import { router, useLocalSearchParams } from 'expo-router';
 import { ActivityIndicator, View } from 'react-native';
 
 import { Button, EmptyState, IconButton, ProgressBar, Screen, StatTile, Text } from '@/components';
+import { SpeakCard } from '@/features/audio/components/SpeakCard';
+import { speakableText } from '@/features/audio/domain/pronunciation';
+import { usePronunciationPractice } from '@/features/audio/usePronunciationPractice';
 import { LearningCard } from '@/features/learning/components/LearningCard';
 import { QuizCard } from '@/features/learning/components/QuizCard';
 import { useInvalidateLearning } from '@/features/learning/hooks';
@@ -110,12 +113,25 @@ export default function SessionScreen() {
             hint={`${summary.correct} of ${summary.quizzes} questions`}
           />
           <StatTile label="New items" value={String(summary.newItems)} />
+          {summary.spoken > 0 ? (
+            <StatTile label="Spoken" value={`${summary.spokenClear}/${summary.spoken}`} hint="understood clearly" />
+          ) : null}
         </View>
       </Screen>
     );
   }
 
   const { question, item, step } = session;
+  if (step?.mode === 'speak' && item) {
+    return (
+      <Screen edges={['top', 'bottom']}>
+        {header}
+        <View style={{ paddingTop: spacing.md }}>
+          <SpeakStep key={`${session.position?.index}-${item.id}`} item={item} onDone={session.completeSpeaking} speak={speak} />
+        </View>
+      </Screen>
+    );
+  }
   if (!question || !item || !step) return null;
   const text = spokenText(item);
   const listen = text ? () => speak(text) : undefined;
@@ -165,5 +181,32 @@ export default function SessionScreen() {
         )}
       </View>
     </Screen>
+  );
+}
+
+function SpeakStep({
+  item,
+  onDone,
+  speak,
+}: {
+  item: LearningItem;
+  onDone: (clear: boolean) => void;
+  speak: (text: string, options?: { slow?: boolean }) => void;
+}) {
+  const text = speakableText(item) ?? '';
+  const practice = usePronunciationPractice({ itemId: item.id, expected: text });
+  const hint = item.type === 'vocabulary' ? item.definition : item.type === 'phrase' ? item.meaning : null;
+  return (
+    <SpeakCard
+      text={text}
+      hint={hint}
+      state={practice.state}
+      attempts={practice.attempts}
+      onListen={() => speak(text)}
+      onListenSlow={() => speak(text, { slow: true })}
+      onSpeak={() => void practice.listen()}
+      onStop={practice.stop}
+      onDone={onDone}
+    />
   );
 }

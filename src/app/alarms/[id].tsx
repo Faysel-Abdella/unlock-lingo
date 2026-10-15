@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react';
 import { Alert, View } from 'react-native';
 
 import { Button, Card, Chip, Screen, Text, TextField } from '@/components';
+import { AlarmSoundPicker } from '@/features/alarms/components/AlarmSoundPicker';
 import { TimeField } from '@/features/alarms/components/TimeField';
 import { describeRepeat, describeTimeUntil, nextOccurrence, shortDayLabel } from '@/features/alarms/domain/schedule';
 import {
@@ -145,6 +146,13 @@ function AlarmForm({ id, initial }: { id: string | null; initial: AlarmInput }) 
             </SettingRow>
           </>
         ) : null}
+        <AlarmSoundPicker value={form.sound} onChange={(sound) => set({ sound })} />
+        <ToggleRow
+          label="Gradually increase volume"
+          hint="Starts quietly and reaches full volume over a minute."
+          value={form.gradualVolume}
+          onChange={(gradualVolume) => set({ gradualVolume })}
+        />
         <ToggleRow label="Vibrate" value={form.vibrate} onChange={(vibrate) => set({ vibrate })} />
       </Card>
 

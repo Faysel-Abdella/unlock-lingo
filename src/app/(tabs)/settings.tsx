@@ -1,11 +1,14 @@
 import Constants from 'expo-constants';
 import { router } from 'expo-router';
-import { Alert, View } from 'react-native';
+import { Alert, Linking, View } from 'react-native';
 
 import { Button, Card, Chip, Screen, SectionHeader, Text } from '@/components';
+import { useNotificationPermission, useSetWeeklyReminder } from '@/features/reviews/reminderHooks';
 import { SettingRow, Stepper, ToggleRow } from '@/features/settings/components';
 import { useProfile, useResetProgress, useSaveProfile, useSettings, useUpdateSettings } from '@/features/settings/hooks';
 import type { AppSettings, UserProfile } from '@/features/settings/schema';
+import { speechRecognitionProvider } from '@/services/audio/speechRecognition';
+import { reminderScheduler } from '@/services/notifications/reminders';
 import { useTheme } from '@/theme/ThemeProvider';
 import {
   CEFR_LEVELS,
@@ -17,6 +20,12 @@ import {
 } from '@/types/language';
 
 const WEEKDAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+const REMINDER_TIMES: { label: string; hour: number }[] = [
+  { label: '9:00', hour: 9 },
+  { label: '12:00', hour: 12 },
+  { label: '18:00', hour: 18 },
+  { label: '20:00', hour: 20 },
+];
 const SPEECH_RATES: { label: string; value: number }[] = [
   { label: 'Slow', value: 0.7 },
   { label: 'Natural', value: 0.9 },
@@ -33,6 +42,46 @@ export default function Settings() {
 function Wrap({ children }: { children: React.ReactNode }) {
   const { spacing } = useTheme();
   return <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm }}>{children}</View>;
+}
+
+function WeeklyReminderSetting({ settings, onChange }: { settings: AppSettings; onChange: (patch: Partial<AppSettings>) => void }) {
+  const permission = useNotificationPermission().data;
+  const setReminder = useSetWeeklyReminder();
+  const reminder = settings.weeklyReminder;
+  const blocked = permission === 'denied';
+  const hint = !reminderScheduler.available
+    ? 'Available in the Android app.'
+    : blocked
+      ? 'Notifications are turned off for Unlock Lingo. Allow them in system settings first.'
+      : `A notification on ${WEEKDAYS[settings.weeklyReviewDay]} when your weekly review is ready. Weeks without learning are skipped.`;
+  return (
+    <>
+      <ToggleRow
+        label="Remind me on review day"
+        hint={hint}
+        value={reminder.enabled && !blocked}
+        onChange={(enabled) => {
+          if (!reminderScheduler.available) return;
+          if (enabled && blocked) void Linking.openSettings();
+          else setReminder.mutate(enabled);
+        }}
+      />
+      {reminder.enabled && !blocked ? (
+        <SettingRow label="Reminder time">
+          <Wrap>
+            {REMINDER_TIMES.map((time) => (
+              <Chip
+                key={time.label}
+                label={time.label}
+                selected={reminder.hour === time.hour && reminder.minute === 0}
+                onPress={() => onChange({ weeklyReminder: { ...reminder, hour: time.hour, minute: 0 } })}
+              />
+            ))}
+          </Wrap>
+        </SettingRow>
+      ) : null}
+    </>
+  );
 }
 
 function SettingsForm({ settings, profile }: { settings: AppSettings; profile: UserProfile }) {
@@ -143,6 +192,7 @@ function SettingsForm({ settings, profile }: { settings: AppSettings; profile: U
             ))}
           </Wrap>
         </SettingRow>
+        <WeeklyReminderSetting settings={settings} onChange={set} />
       </Card>
 
       <SectionHeader title="Daily moments" />
@@ -179,6 +229,20 @@ function SettingsForm({ settings, profile }: { settings: AppSettings; profile: U
           hint="Speak the word when a question with audio appears."
           value={settings.autoPlayAudio}
           onChange={(v) => set({ autoPlayAudio: v })}
+        />
+        <ToggleRow
+          label="Speaking practice"
+          hint={
+            speechRecognitionProvider.isAvailable()
+              ? 'Say a few words aloud in each session. Practice only: it never changes when words come back.'
+              : 'Speech recognition is not available on this device.'
+          }
+          value={settings.speakingPractice && speechRecognitionProvider.isAvailable()}
+          onChange={(enabled) => {
+            if (!speechRecognitionProvider.isAvailable()) return;
+            if (!enabled) set({ speakingPractice: false });
+            else void speechRecognitionProvider.requestPermission().then((granted) => set({ speakingPractice: granted }));
+          }}
         />
       </Card>
 

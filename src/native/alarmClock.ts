@@ -19,6 +19,9 @@ export interface NativeAlarmSpec {
   snoozeEnabled: boolean;
   snoozeMinutes: number;
   maxSnoozes: number;
+  /** Null = the system default alarm sound. */
+  soundUri: string | null;
+  gradualVolume: boolean;
 }
 
 export interface AlarmPermissionStatus {
@@ -46,6 +49,9 @@ interface AlarmClockNativeModule {
   openFullScreenIntentSettings(): void;
   openNotificationSettings(): void;
   openBatteryOptimizationSettings(): void;
+  listAlarmSounds(): Promise<unknown>;
+  previewSound(uri: string | null): void;
+  stopPreview(): void;
 }
 
 const native = requireOptionalNativeModule<AlarmClockNativeModule>('AlarmClock');
@@ -70,6 +76,8 @@ export const nativeAlarmEventSchema = z.discriminatedUnion('type', [
   z.object({ type: z.literal('disabled'), alarmId: z.string(), at: z.number() }),
 ]);
 export type NativeAlarmEvent = z.infer<typeof nativeAlarmEventSchema>;
+
+const alarmSoundsSchema = z.array(z.object({ uri: z.string().min(1), title: z.string().min(1) }));
 
 const permissionSchema = z.object({
   exactAlarms: z.boolean(),
@@ -117,6 +125,17 @@ export const alarmClock = {
   onRingingChanged(listener: (alarmId: string | null) => void): Subscription | null {
     return native?.addListener('onRingingChanged', (e) => listener(e.alarmId)) ?? null;
   },
+
+  /** Alarm sounds installed on the device; empty when unavailable. */
+  async listAlarmSounds(): Promise<{ uri: string; title: string }[]> {
+    if (!native) return [];
+    const parsed = alarmSoundsSchema.safeParse(await native.listAlarmSounds());
+    return parsed.success ? parsed.data : [];
+  },
+
+  /** Plays a few seconds of a sound (null = the default alarm sound). */
+  previewSound: (uri: string | null) => native?.previewSound(uri),
+  stopPreview: () => native?.stopPreview(),
 
   openExactAlarmSettings: () => native?.openExactAlarmSettings(),
   openFullScreenIntentSettings: () => native?.openFullScreenIntentSettings(),

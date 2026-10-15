@@ -2,7 +2,8 @@ import type { ExerciseType } from '@/types/learning';
 
 import type { QueueEntry, QueueReason } from './queue';
 
-export type StepMode = 'intro' | 'quiz';
+/** `speak` is optional pronunciation practice; it never affects scheduling. */
+export type StepMode = 'intro' | 'quiz' | 'speak';
 
 export interface SessionStep {
   itemId: string;
@@ -29,6 +30,8 @@ export interface SessionState {
 export const INTRO_QUIZ_GAP = 3;
 /** A missed item comes back this many steps later, once per session. */
 export const RETRY_GAP = 3;
+/** Speaking practice is kept short: at most this many speak steps per session. */
+export const MAX_SPEAK_STEPS = 3;
 
 function insertAt<T>(list: T[], position: number, value: T): T[] {
   const copy = [...list];
@@ -56,6 +59,26 @@ export function createSession(entries: readonly QueueEntry[], canQuiz: (itemId: 
     }
   }
   return { steps, index: 0, answers: [], retried: [] };
+}
+
+/**
+ * Adds speaking practice right after the first quiz of up to `max` items that
+ * can be spoken, so the learner says a word they have just recalled.
+ */
+export function addSpeakingPractice(
+  state: SessionState,
+  canSpeak: (itemId: string) => boolean,
+  max = MAX_SPEAK_STEPS,
+): SessionState {
+  const chosen = new Set<string>();
+  const steps: SessionStep[] = [];
+  for (const step of state.steps) {
+    steps.push(step);
+    if (chosen.size >= max || step.mode !== 'quiz' || chosen.has(step.itemId) || !canSpeak(step.itemId)) continue;
+    chosen.add(step.itemId);
+    steps.push({ itemId: step.itemId, mode: 'speak', reason: step.reason });
+  }
+  return { ...state, steps };
 }
 
 export function currentStep(state: SessionState): SessionStep | null {
@@ -98,13 +121,18 @@ export interface SessionSummary {
   newItems: number;
   /** Items whose final answer in this session was wrong. */
   missedItemIds: string[];
+  /** Speaking practice attempts and how many were recognised clearly. */
+  spoken: number;
+  spokenClear: number;
 }
 
 export function summarize(state: SessionState): SessionSummary {
   const quizzes = state.answers.filter((a) => a.mode === 'quiz');
   const correct = quizzes.filter((a) => a.correct).length;
+  const spoken = state.answers.filter((a) => a.mode === 'speak');
   const lastByItem = new Map<string, SessionAnswer>();
-  for (const a of state.answers) lastByItem.set(a.itemId, a);
+  // Speaking practice is optional and never marks an item as missed.
+  for (const a of state.answers) if (a.mode !== 'speak') lastByItem.set(a.itemId, a);
   return {
     interactions: state.answers.length,
     quizzes: quizzes.length,
@@ -112,5 +140,7 @@ export function summarize(state: SessionState): SessionSummary {
     accuracy: quizzes.length === 0 ? null : correct / quizzes.length,
     newItems: new Set(state.steps.filter((s) => s.reason === 'new').map((s) => s.itemId)).size,
     missedItemIds: [...lastByItem.values()].filter((a) => !a.correct).map((a) => a.itemId),
+    spoken: spoken.length,
+    spokenClear: spoken.filter((a) => a.correct).length,
   };
 }

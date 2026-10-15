@@ -6,6 +6,12 @@ import type { ExerciseType } from '@/types/learning';
 export type Weekday = 1 | 2 | 3 | 4 | 5 | 6 | 7;
 export const WEEKDAYS: readonly Weekday[] = [1, 2, 3, 4, 5, 6, 7];
 
+/** A device alarm sound. */
+export interface AlarmSound {
+  uri: string;
+  title: string;
+}
+
 export interface Alarm {
   id: string;
   label: string;
@@ -22,6 +28,10 @@ export interface Alarm {
   snoozeMinutes: number;
   maxSnoozes: number;
   vibrate: boolean;
+  /** Null = the system's default alarm sound. */
+  sound: AlarmSound | null;
+  /** Start quietly and reach full volume over a minute. */
+  gradualVolume: boolean;
 }
 
 export type AlarmInput = Omit<Alarm, 'id'>;
@@ -38,6 +48,8 @@ export const ALARM_DEFAULTS: AlarmInput = {
   snoozeMinutes: 9,
   maxSnoozes: 3,
   vibrate: true,
+  sound: null,
+  gradualVolume: true,
 };
 
 export const QUESTION_COUNT_RANGE = { min: 1, max: 15 } as const;
@@ -90,4 +102,6 @@ export const alarmInputSchema = z.object({
   snoozeMinutes: z.number().int().min(SNOOZE_MINUTES_RANGE.min).max(SNOOZE_MINUTES_RANGE.max),
   maxSnoozes: z.number().int().min(MAX_SNOOZES_RANGE.min).max(MAX_SNOOZES_RANGE.max),
   vibrate: z.boolean(),
+  sound: z.object({ uri: z.string().min(1).max(500), title: z.string().trim().min(1).max(120) }).nullable(),
+  gradualVolume: z.boolean(),
 });

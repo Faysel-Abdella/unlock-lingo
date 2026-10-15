@@ -40,6 +40,23 @@
             "backgroundColor": "#121413"
           }
         }
+      ],
+      [
+        "expo-notifications",
+        {
+          "color": "#0F766E"
+        }
+      ],
+      [
+        "expo-speech-recognition",
+        {
+          "microphonePermission": "Unlock Lingo uses the microphone only while you practise saying a word.",
+          "speechRecognitionPermission": "Unlock Lingo checks whether your pronunciation was understood.",
+          "androidSpeechServicePackages": [
+            "com.google.android.as",
+            "com.google.android.googlequicksearchbox"
+          ]
+        }
       ]
     ],
     "web": {

@@ -105,6 +105,8 @@ class AlarmStore(context: Context) {
     .put("snoozeEnabled", s.snoozeEnabled)
     .put("snoozeMinutes", s.snoozeMinutes)
     .put("maxSnoozes", s.maxSnoozes)
+    .put("soundUri", s.soundUri ?: JSONObject.NULL)
+    .put("gradualVolume", s.gradualVolume)
 
   private fun specFromJson(j: JSONObject) = AlarmSpec(
     id = j.getString("id"),
@@ -117,6 +119,8 @@ class AlarmStore(context: Context) {
     snoozeEnabled = j.optBoolean("snoozeEnabled", true),
     snoozeMinutes = j.optInt("snoozeMinutes", 9),
     maxSnoozes = j.optInt("maxSnoozes", 3),
+    soundUri = if (j.isNull("soundUri")) null else j.optString("soundUri").takeIf { it.isNotBlank() },
+    gradualVolume = j.optBoolean("gradualVolume", true),
   )
 
   companion object {

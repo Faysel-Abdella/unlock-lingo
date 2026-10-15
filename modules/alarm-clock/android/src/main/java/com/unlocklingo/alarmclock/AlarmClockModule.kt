@@ -25,8 +25,11 @@ class AlarmSpecRecord : Record {
   @Field val snoozeEnabled: Boolean = true
   @Field val snoozeMinutes: Int = 9
   @Field val maxSnoozes: Int = 3
+  @Field val soundUri: String? = null
+  @Field val gradualVolume: Boolean = true
 
-  fun toSpec() = AlarmSpec(id, label, hour, minute, daysMask, enabled, vibrate, snoozeEnabled, snoozeMinutes, maxSnoozes)
+  fun toSpec() =
+    AlarmSpec(id, label, hour, minute, daysMask, enabled, vibrate, snoozeEnabled, snoozeMinutes, maxSnoozes, soundUri, gradualVolume)
 }
 
 class AlarmClockModule : Module() {
@@ -71,6 +74,20 @@ class AlarmClockModule : Module() {
     /** Drains native outcome events (fired, snoozed, stopped, disabled) for import into SQLite. */
     Function("consumeEvents") {
       AlarmStore(context).drainEvents()
+    }
+
+    /** The device's alarm sounds: [{ title, uri }]. */
+    AsyncFunction("listAlarmSounds") {
+      AlarmSounds.list(context)
+    }
+
+    /** Plays a short preview of a sound (null = the default alarm sound). */
+    Function("previewSound") { uri: String? ->
+      AlarmSounds.startPreview(context, uri)
+    }
+
+    Function("stopPreview") {
+      AlarmSounds.stopPreview()
     }
 
     Function("getPermissionStatus") {

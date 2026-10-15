@@ -1,24 +1,29 @@
+import type { Hypothesis } from '@/features/audio/domain/pronunciation';
 import type { LanguageCode } from '@/types/language';
 
-export interface RecognitionResult {
-  transcript: string;
-  /** 0–1, as reported by the engine. */
-  confidence: number;
-}
+export type RecognitionOutcome =
+  | { kind: 'heard'; hypotheses: Hypothesis[] }
+  /** Nothing was said (or nothing recognisable) before the recogniser gave up. */
+  | { kind: 'silence' }
+  | { kind: 'denied' }
+  | { kind: 'unavailable'; reason: string }
+  | { kind: 'cancelled' };
 
 /**
- * Speech recognition for future pronunciation practice ("say the word").
- * Nothing in the app depends on it yet; a provider backed by an on-device
- * recogniser can be added behind this interface.
+ * Speech recognition for pronunciation practice. Implementations should
+ * prefer on-device recognition so practice works offline.
  */
 export interface SpeechRecognitionProvider {
-  readonly available: boolean;
-  recognize(options: { language: LanguageCode; expected?: string }): Promise<RecognitionResult | null>;
+  isAvailable(): boolean;
+  /** Asks for microphone (and recogniser) permission. */
+  requestPermission(): Promise<boolean>;
+  recognize(options: { language: LanguageCode }): Promise<RecognitionOutcome>;
   cancel(): void;
 }
 
 export const nullSpeechRecognitionProvider: SpeechRecognitionProvider = {
-  available: false,
-  recognize: async () => null,
+  isAvailable: () => false,
+  requestPermission: async () => false,
+  recognize: async () => ({ kind: 'unavailable', reason: 'Speech recognition is not available on this device.' }),
   cancel: () => undefined,
 };

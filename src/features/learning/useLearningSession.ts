@@ -2,7 +2,9 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 
 import { useProfile, useSettings } from '@/features/settings/hooks';
 import { useRepositories } from '@/hooks/useRepositories';
-import type { ExerciseType } from '@/types/learning';
+import { completeWeeklyReview, loadWeeklyReview, prepareWeeklySession } from '@/features/reviews/weeklyService';
+import type { WeeklyStats } from '@/features/reviews/domain/weekly';
+import type { ExerciseType, ReviewContext } from '@/types/learning';
 
 import { type Question, generateQuestion, introCard } from './domain/exercises';
 import type { AnswerOutcome } from './domain/review';
@@ -18,12 +20,17 @@ interface Answer {
   exerciseType: ExerciseType;
 }
 
+export type SessionKind = 'daily' | 'weekly';
+
 /**
- * Drives a "Today's learning" session: builds the queue once, generates a
- * question per step, persists every answer immediately (so closing early never
- * loses progress) and advances through intro/quiz/retry steps.
+ * Drives a learning session: builds the steps once, generates a question per
+ * step, persists every answer immediately (so closing early never loses
+ * progress) and advances through intro/quiz/retry steps.
+ *
+ * - `daily`: "Today's learning", from the review queue.
+ * - `weekly`: the weekly review quiz; completing it saves the week's snapshot.
  */
-export function useLearningSession() {
+export function useLearningSession(kind: SessionKind = 'daily') {
   const repos = useRepositories();
   const profile = useProfile().data;
   const settings = useSettings().data;
@@ -35,11 +42,20 @@ export function useLearningSession() {
   const [pending, setPending] = useState<Answer | null>(null);
   const [lastTypes, setLastTypes] = useState<Record<string, string>>({});
   const [savedIds, setSavedIds] = useState<Set<string>>(new Set());
+  const [weeklyStats, setWeeklyStats] = useState<WeeklyStats | null>(null);
+  const weeklySaved = useRef(false);
+  const context: ReviewContext = kind === 'weekly' ? 'weekly' : 'session';
 
   useEffect(() => {
     if (!profile || !settings || started.current) return;
     started.current = true;
-    prepareSession(repos, profile, settings, Date.now())
+    const prepare = async (): Promise<PreparedSession> => {
+      if (kind === 'daily') return prepareSession(repos, profile, settings, Date.now());
+      const review = await loadWeeklyReview(repos, profile, settings, Date.now());
+      setWeeklyStats(review.stats);
+      return prepareWeeklySession(repos, profile, review.quizItemIds);
+    };
+    prepare()
       .then((p) => {
         setPrepared(p);
         setSession(p.state);
@@ -47,7 +63,7 @@ export function useLearningSession() {
         setSavedIds(new Set(p.personalItemIds));
       })
       .catch((e: unknown) => setError(e instanceof Error ? e : new Error(String(e))));
-  }, [repos, profile, settings]);
+  }, [repos, profile, settings, kind]);
 
   const step = session ? currentStep(session) : null;
 
@@ -76,6 +92,16 @@ export function useLearningSession() {
           ? 'done'
           : 'active';
 
+  // Completing the weekly quiz saves the week, so the review is not offered again.
+  useEffect(() => {
+    if (kind !== 'weekly' || phase !== 'done' || !weeklyStats || !session || weeklySaved.current) return;
+    weeklySaved.current = true;
+    const { quizzes, correct } = summarize(session);
+    void completeWeeklyReview(repos, weeklyStats, { questions: quizzes, correct }, Date.now()).catch((e: unknown) =>
+      console.warn('Could not save weekly review', e),
+    );
+  }, [kind, phase, weeklyStats, session, repos]);
+
   /** Persists an answer for the current step. Quizzes then show feedback until `advance`. */
   async function record(outcome: AnswerOutcome, exerciseType: ExerciseType): Promise<Answer | null> {
     if (!step || !prepared) return null;
@@ -89,7 +115,7 @@ export function useLearningSession() {
       itemType: item.type,
       exerciseType,
       outcome,
-      context: 'session',
+      context,
       now: Date.now(),
     });
     return answer;

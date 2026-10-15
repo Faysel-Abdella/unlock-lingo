@@ -13,7 +13,7 @@ as it is now. This file records the design intent behind it.
 | **1** | Project setup, navigation, SQLite and migrations, learning-item schema, seed content, FSRS engine, queue prioritisation, vocabulary cards, My Words, progress tracking, dashboard, onboarding, settings | None |
 | **2** | Alarm CRUD, `AlarmManager` scheduling, boot rescheduling, full-screen ringing, learning challenge, emergency dismiss, snooze | Kotlin module and config plugin |
 | **3** | Unlock detection (opt-in foreground service), interruption policy (daily cap, cooldown, quiet/work hours), notification card fallback | Kotlin service and receivers |
-| **4** | Weekly review, analytics snapshots, CEFR promotion UI, richer audio (prerecorded audio, speech recognition hook) | Optional |
+| **4** | Weekly review and quiz, weekly snapshots and analytics, gradual level mixing, voice selection and slow replay, speech recognition interface | None |
 | **5** | Optional AI personalisation behind `AIContentProvider` | None |
 
 Guiding rules:
@@ -98,10 +98,15 @@ non-Android platforms and tests.
   - new items limited to 30% of a session.
 
   New items are picked personal-first, then by CEFR band from the level policy, then interest
-  tags.
-- **Level policy:** start at the user's current CEFR level. Unlock the next level when accuracy at
-  the current level is ≥ 85% over ≥ 30 reviews, never going past the target level. Fall back a
-  level when accuracy is < 60%.
+  tags. Within each level they are mixed by type (60% vocabulary, 20% phrases, 20% grammar).
+- **Level policy:** start at the user's current CEFR level. With ≥ 30 answers in the last 30
+  days at that level, the next level is mixed in gradually: 25% of new items at ≥ 85% accuracy,
+  40% at ≥ 90%, 50% at ≥ 95%. Never past the target level. Below 60%, 30% of new items come
+  from the level below. Levels are interleaved by largest-deficit rounding.
+- **Weekly review (Phase 4):** the week ends on the configured review day. Stats come from
+  `review_history`, excluding the weekly quiz's own answers. The quiz takes 60% struggling items,
+  then items first seen that week, then the rest, skipping mastered ones. Completing it stores a
+  Zod-validated snapshot in `weekly_stats`.
 
 ## 5. Database schema (migration 1)
 
@@ -138,7 +143,7 @@ personal_vocabulary id PK, item_id→learning_items (UNIQUE), word, context_note
 
 daily_activity      date PK, interactions, correct, incorrect, new_items, reviews,
                     grammar_answered, unlock_cards_shown, alarm_challenges, updated_at
-weekly_stats        week_start PK, snapshot(JSON), created_at                (populated in Phase 4)
+weekly_stats        week_start PK, snapshot(JSON), created_at                (Phase 4)
 
 alarms              id PK, label, hour, minute, days_mask(bit0=Mon), enabled, question_count,
                     challenge_types(JSON), snooze_enabled, snooze_minutes, max_snoozes, vibrate,

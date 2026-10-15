@@ -28,6 +28,11 @@ export interface QueueOptions {
   newItemsRemainingToday: number;
   /** Levels new seed content may come from, preferred first. Personal words ignore this. */
   allowedLevels: readonly CefrLevel[];
+  /**
+   * Optional share of new items per level (from the level policy). When given,
+   * levels are mixed by share instead of exhausting the first level first.
+   */
+  levelShares?: Partial<Record<CefrLevel, number>>;
   interests: readonly string[];
   /** Maximum share of a session given to new items when reviews exist. */
   maxNewRatio?: number;
@@ -41,6 +46,15 @@ export interface QueueOptions {
 export const DEFAULT_MAX_NEW_RATIO = 0.3;
 export const DEFAULT_BACKLOG_LIMIT = 15;
 export const DEFAULT_EXTRA_PRACTICE_GAP_MS = 4 * 60 * 60 * 1000;
+/**
+ * Share of new items per type. Without it, ranking by interest and content
+ * difficulty lets one type (e.g. easy, broadly tagged grammar) fill every slot.
+ */
+export const NEW_TYPE_SHARES: Readonly<Record<LearningItemType, number>> = {
+  vocabulary: 0.6,
+  phrase: 0.2,
+  grammar: 0.2,
+};
 
 function isNew(c: QueueCandidate): boolean {
   return c.progress === null || c.progress.reps === 0;
@@ -54,8 +68,18 @@ function isDifficult(c: QueueCandidate): boolean {
   return c.progress?.status === 'difficult' || c.personal?.isDifficult === true;
 }
 
-function hasFailedBefore(c: QueueCandidate): boolean {
-  return (c.progress?.lapses ?? 0) > 0 || c.progress?.lastRating === 1 || (c.progress?.incorrectCount ?? 0) > 0;
+/** A correct streak this long means a past failure has been overcome. */
+export const RECOVERED_STREAK = 2;
+
+/**
+ * Previously failed and not yet recovered. Items failed long ago but answered
+ * correctly since are not offered as extra practice (no unnecessarily easy material).
+ */
+function needsFailurePractice(c: QueueCandidate): boolean {
+  const p = c.progress;
+  if (!p) return false;
+  const failed = p.lapses > 0 || p.lastRating === 1 || p.incorrectCount > 0;
+  return failed && (p.lastRating === 1 || p.streak < RECOVERED_STREAK);
 }
 
 function seenRecently(c: QueueCandidate, now: number, gapMs: number): boolean {
@@ -148,7 +172,7 @@ export function buildQueue(candidates: readonly QueueCandidate[], opts: QueueOpt
     .sort((a, b) => (b.progress?.difficulty ?? 0) - (a.progress?.difficulty ?? 0));
   const difficultIds = new Set(difficult.map((c) => c.itemId));
   const failed = notDueReviewed
-    .filter((c) => !difficultIds.has(c.itemId) && hasFailedBefore(c))
+    .filter((c) => !difficultIds.has(c.itemId) && needsFailurePractice(c))
     .sort((a, b) => (a.progress?.lastReviewedAt ?? 0) - (b.progress?.lastReviewedAt ?? 0));
 
   const fresh = eligible
@@ -173,8 +197,78 @@ export function buildQueue(candidates: readonly QueueCandidate[], opts: QueueOpt
   const newTake = Math.min(newAllowance, size - reviewTake);
 
   const reviews = reviewPool.slice(0, reviewTake);
-  const news = fresh.slice(0, newTake).map((c) => ({ itemId: c.itemId, reason: 'new' as const }));
+  const typeMixed = mixTypesWithinLevels(fresh);
+  const orderedFresh = opts.levelShares ? mixByLevel(typeMixed, opts.levelShares) : typeMixed;
+  const news = orderedFresh.slice(0, newTake).map((c) => ({ itemId: c.itemId, reason: 'new' as const }));
   return interleave(reviews, news);
+}
+
+/**
+ * Reorders items so each key appears in proportion to its share, keeping the
+ * order within each key: every slot goes to the key furthest behind its share
+ * (largest-deficit rounding). Items whose key has no share are dropped.
+ */
+function mixByShare<T, K extends string>(
+  items: readonly T[],
+  keyOf: (item: T) => K,
+  shares: Partial<Record<K, number>>,
+): T[] {
+  const pools = new Map<K, T[]>();
+  for (const item of items) {
+    const key = keyOf(item);
+    if (!(shares[key] ?? 0)) continue;
+    pools.set(key, [...(pools.get(key) ?? []), item]);
+  }
+  const taken = new Map<K, number>();
+  const result: T[] = [];
+  const total = [...pools.values()].reduce((n, p) => n + p.length, 0);
+  for (let k = 1; result.length < total; k++) {
+    let best: K | null = null;
+    let bestDeficit = -Infinity;
+    for (const [key, pool] of pools) {
+      const used = taken.get(key) ?? 0;
+      if (used >= pool.length) continue;
+      const deficit = (shares[key] ?? 0) * k - used;
+      if (deficit > bestDeficit) {
+        bestDeficit = deficit;
+        best = key;
+      }
+    }
+    if (best === null) break;
+    const used = taken.get(best) ?? 0;
+    result.push((pools.get(best) as T[])[used] as T);
+    taken.set(best, used + 1);
+  }
+  return result;
+}
+
+/**
+ * Mixes item types (mostly vocabulary, some phrases and grammar) within each
+ * level, keeping personal words first and levels in their ranked order.
+ */
+export function mixTypesWithinLevels(fresh: readonly QueueCandidate[]): QueueCandidate[] {
+  const personal = fresh.filter((c) => c.personal !== null);
+  const byLevel = new Map<CefrLevel, QueueCandidate[]>();
+  for (const c of fresh) {
+    if (c.personal !== null) continue;
+    byLevel.set(c.cefrLevel, [...(byLevel.get(c.cefrLevel) ?? []), c]);
+  }
+  const mixed = [...byLevel.values()].flatMap((pool) => mixByShare(pool, (c) => c.type, NEW_TYPE_SHARES));
+  return [...personal, ...mixed];
+}
+
+/**
+ * Reorders new items so levels appear in proportion to their share: personal
+ * words stay first, then each slot goes to the level furthest behind its share,
+ * keeping each level's internal order.
+ */
+export function mixByLevel(
+  fresh: readonly QueueCandidate[],
+  shares: Partial<Record<CefrLevel, number>>,
+): QueueCandidate[] {
+  const personal = fresh.filter((c) => c.personal !== null);
+  const seed = fresh.filter((c) => c.personal === null);
+  return [...personal, ...mixByShare(seed, (c) => c.cefrLevel, shares)];
 }
 
 /** Number of reviews currently due, used for dashboard counts and backlog gating. */

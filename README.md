@@ -18,7 +18,7 @@ see, so reviews of older material always come before new words. Everything works
 | 1 | Project setup, navigation, SQLite and migrations, content schema and seed data, FSRS engine, vocabulary cards, My Words, progress tracking, dashboard, onboarding, settings | ✅ Done |
 | 2 | Alarm creation, `AlarmManager` integration, full-screen alarm, learning challenge, reliable dismissal | ✅ Built; needs device testing (see [Alarm test checklist](#alarm-test-checklist)) |
 | 3 | Unlock detection, interruption policy (cap, cooldown, quiet/work hours), notification fallback | ✅ Built; needs device testing (see [Unlock card test checklist](#unlock-card-test-checklist)) |
-| 4 | Weekly review, analytics snapshots, richer adaptive difficulty, audio improvements | Planned |
+| 4 | Weekly review and quiz, weekly snapshots and analytics, gradual level mixing, voice selection and slow replay | ✅ Done |
 | 5 | Optional AI personalisation | Planned |
 
 The full plan, Android risk analysis and schema rationale are in
@@ -84,7 +84,8 @@ src/
   app/                    Expo Router routes only (thin screens)
     (tabs)/               Home · Learn · My Words · Progress · Settings
     onboarding.tsx        first-run profile setup
-    session.tsx           Today's learning session (full-screen)
+    session.tsx           Today's learning session (full-screen); `?kind=weekly` runs the weekly quiz
+    weekly-review.tsx     weekly summary and quiz entry point
     vocabulary/           browser + item detail
     words/                add word + personal word detail
     alarms/               alarm list + editor
@@ -100,11 +101,15 @@ src/
     alarms/               alarmService (sync, native event import, challenge content), hooks, screens' logic
     unlock/domain/        PURE TS: interruption policy (cap, cooldown, quiet/work hours, frequency), settings
     unlock/               unlockService (card deck, native sync, event import), hooks
+    reviews/domain/       PURE TS: review week window, weekly stats, weekly quiz selection
+    reviews/              weeklyService (load, prepare quiz, save snapshot), hooks
+    audio/domain/         PURE TS: TTS voice selection, slow rate
+    progress/domain/      PURE TS: weekly trends, level-mix description, smart-difficulty status
     vocabulary/ settings/ onboarding/ progress/   feature hooks and components
   repositories/           SQL lives here only. One repository per aggregate, plus row mappers
   services/
     database/             Database interface, migrations, versioned seed content, test adapter
-    audio/                PronunciationService (TTS now; recorded audio or ASR later)
+    audio/                PronunciationService (TTS with best-voice selection), SpeechRecognitionProvider (null for now)
     ai/                   AIContentProvider interface + offline default
   native/                 typed bridges to native modules, with no-op fallbacks
   hooks/                  repositories context, query keys, pronunciation, date
@@ -147,9 +152,48 @@ imports.
   - none while 15 or more reviews are overdue;
   - at most 30% of a session while reviews wait;
   - a review always comes first.
-- **Smart difficulty.** New material comes from your current CEFR level. After ≥ 85% accuracy
-  over 30+ reviews the next level is mixed in, capped at your target level. Below 60% the level
-  below is mixed in. When the next level is also mastered, the dashboard suggests moving up.
+
+  New items are mixed by type within each level (60% vocabulary, 20% phrases, 20% grammar), so
+  one type can't take every slot. A previously failed item counts as recovered after two correct
+  answers in a row.
+- **Smart difficulty.** New material comes from your current CEFR level, judged on the last 30
+  days of answers. After 30+ answers the mix adapts gradually:
+
+  | Accuracy at your level | New material |
+  | ---------------------- | ------------ |
+  | ≥ 95% | 50% current · 50% next |
+  | ≥ 90% | 60% current · 40% next |
+  | ≥ 85% | 75% current · 25% next |
+  | < 60% | 70% current · 30% level below |
+
+  Levels are interleaved by largest-deficit rounding, never past your target level. When the
+  next level is also above 85%, the dashboard suggests moving up. Progress explains the current
+  mix.
+
+### Weekly review
+
+- **When.** From your review day (Sunday by default; set it in Settings), the dashboard offers a
+  review of the seven days ending that day, provided you practised that week. The offer stays
+  until you complete it or the next review day replaces it. Learn → Weekly review opens it at
+  any time.
+- **Summary.** Words and phrases encountered, new ones learned, older ones reviewed, grammar
+  questions, accuracy, streak and active days, the most difficult items and the newly mastered
+  ones. A first-exposure "new to me" isn't scored, matching the scheduler.
+- **Quiz.** Up to 16 questions, about 5–10 minutes: 60% items you struggled with (most mistakes
+  first), then items first seen that week, then other items from the week. Mastered items are
+  skipped. Answers update FSRS like any review (context `weekly`) but don't count towards the
+  week being summarised.
+- **Snapshots.** Completing the quiz saves the week to `weekly_stats`, so it isn't offered again
+  and appears in Progress → Weekly reviews with its accuracy trend.
+
+### Audio
+
+- Text-to-speech picks the best installed voice per language: exact locale, then enhanced
+  quality, then offline voices ahead of network ones. The choice is cached per locale.
+- "Listen slowly" replays at 60% of your speech rate (minimum 0.4) on cards and listening
+  questions.
+- `SpeechRecognitionProvider` defines the interface for future pronunciation practice. The
+  default implementation reports itself as unavailable.
 
 ## Database schema
 
@@ -168,7 +212,7 @@ a new one.
 | `review_history` | Every answer with exercise type, rating, response time, context (`session`, `unlock`, `alarm`, `weekly`) and before/after scheduling state |
 | `personal_vocabulary` | My Words: links to a learning item, plus context note, source and important/difficult/mastered flags, and enrichment status |
 | `daily_activity` | Per-day counters: interactions, correct, incorrect, new, reviews, grammar, unlock cards, alarm challenges |
-| `weekly_stats` | Weekly snapshots (Phase 4) |
+| `weekly_stats` | One snapshot per completed weekly review (JSON, validated with Zod), keyed by week start |
 | `alarms` / `alarm_history` | Alarm definitions, and every ring: fired time, snoozes, how it was dismissed (`challenge`, `emergency`, `timeout`), questions answered/correct |
 
 **Seed content.** 100 vocabulary items, 30 grammar questions and 20 phrases, across B1, B2 and
@@ -340,9 +384,9 @@ classes. Card delivery still has to be checked on a device:
   volume ramp, and a wheel-style time picker.
 - **Phase 3 follow-ups:** device testing (checklist above), a home-screen widget as a further
   low-interruption option, and Listen directly from the notification.
-- **Phase 4:** weekly review (default Sunday, configurable): a summary plus a 5–10 minute quiz
-  focused on difficult and recent items. Also `weekly_stats` snapshots, richer analytics,
-  prerecorded audio, and a pronunciation exercise using speech recognition.
+- **Phase 4 follow-ups:** prerecorded audio for seed content, a pronunciation exercise built on
+  an on-device `SpeechRecognitionProvider`, a weekly-review reminder notification, and charts
+  over longer periods.
 - **Phase 5:** concrete `AIContentProvider` implementations: enrich My Words, write
   interest-tailored examples, generate exercises, explain mistakes. Always optional and
   replaceable.

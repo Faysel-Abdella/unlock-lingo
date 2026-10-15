@@ -48,6 +48,14 @@ describe('computeLevelPolicy (smart difficulty)', () => {
     ]);
   });
 
+  it('grows the share of the next level with accuracy', () => {
+    const share = (correct: number) => computeLevelPolicy('B1', 'C1', [{ level: 'B1', reviews: 100, correct }]).shares;
+    expect(share(70)).toEqual({ B1: 1 });
+    expect(share(86)).toEqual({ B1: 0.75, B2: 0.25 });
+    expect(share(91)).toEqual({ B1: 0.6, B2: 0.4 });
+    expect(share(97)).toEqual({ B1: 0.5, B2: 0.5 });
+  });
+
   it('never goes beyond the target level', () => {
     expect(computeLevelPolicy('B2', 'B2', [{ level: 'B2', reviews: 50, correct: 50 }]).allowedLevels).toEqual(['B2']);
   });

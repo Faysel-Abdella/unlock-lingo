@@ -5,7 +5,7 @@ import type { LearningItem, LearningStatus } from '@/types/learning';
 import { type DateKey, addDays, toDateKey } from '@/utils/date';
 
 import { DAY_MS } from './domain/fsrs';
-import { computeLevelPolicy, type LevelPolicy } from './domain/levelPolicy';
+import { computeLevelPolicy, type LevelAccuracy, type LevelPolicy } from './domain/levelPolicy';
 import { buildQueue, countDue, type QueueCandidate } from './domain/queue';
 import { effectiveStatus } from './domain/review';
 import { createSession, type SessionState } from './domain/session';
@@ -101,6 +101,7 @@ export async function prepareSession(
     size,
     newItemsRemainingToday: Math.max(0, settings.newItemsPerDay - day.newItems),
     allowedLevels: levelPolicy.allowedLevels,
+    levelShares: levelPolicy.shares,
     interests: profile.interests,
   });
 
@@ -149,6 +150,9 @@ export interface ProgressOverview {
   statusCounts: Record<LearningStatus, number>;
   streak: StreakInfo;
   levels: LevelTotals[];
+  /** Quiz accuracy per level over the smart-difficulty window. */
+  levelAccuracy: LevelAccuracy[];
+  levelPolicy: LevelPolicy;
   difficultItems: { id: string; label: string }[];
 }
 
@@ -164,11 +168,12 @@ export async function loadProgressOverview(
   now: number,
 ): Promise<ProgressOverview> {
   const today = toDateKey(now);
-  const [week, candidates, streak, levels] = await Promise.all([
+  const [week, candidates, streak, levels, levelAccuracy] = await Promise.all([
     repos.activity.getRange(addDays(today, -6), today),
     repos.progress.getQueueCandidates(profile.targetLanguage),
     getStreak(repos, today),
     repos.content.levelTotals(profile.targetLanguage),
+    repos.progress.getLevelAccuracy(profile.targetLanguage, now - LEVEL_WINDOW_MS),
   ]);
   const difficultIds = candidates
     .filter((c) => effectiveStatus(c.progress?.status ?? 'new', c.personal) === 'difficult')
@@ -185,6 +190,8 @@ export async function loadProgressOverview(
     statusCounts: countStatuses(candidates),
     streak,
     levels,
+    levelAccuracy,
+    levelPolicy: computeLevelPolicy(profile.currentLevel, profile.targetLevel, levelAccuracy),
     difficultItems,
   };
 }

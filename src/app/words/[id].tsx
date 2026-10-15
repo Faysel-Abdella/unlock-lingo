@@ -58,7 +58,7 @@ function WordDetail({ word }: { word: PersonalWord }) {
 
   return (
     <Screen edges={[]}>
-      <LearningCard item={word.item} actions={{ onListen: () => speak(word.word) }} />
+      <LearningCard item={word.item} actions={{ onListen: () => speak(word.word), onListenSlow: () => speak(word.word, { slow: true }) }} />
 
       <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm }}>
         <Chip label="★ Important" selected={word.flags.isImportant} onPress={() => toggle('isImportant')} />

@@ -87,6 +87,7 @@ function Navigator() {
         <Stack.Screen name="words/[id]" options={{ title: '' }} />
         <Stack.Screen name="alarms/index" options={{ title: 'Alarms' }} />
         <Stack.Screen name="alarms/[id]" options={{ title: 'Alarm' }} />
+        <Stack.Screen name="weekly-review" options={{ title: 'Weekly review' }} />
         <Stack.Screen name="unlock-settings" options={{ title: 'Unlock learning' }} />
         <Stack.Screen name="card" options={{ title: '', presentation: 'modal' }} />
         <Stack.Screen name="alarm/ring" options={{ headerShown: false, gestureEnabled: false, animation: 'fade' }} />

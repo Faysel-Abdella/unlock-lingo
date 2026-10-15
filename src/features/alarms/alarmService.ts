@@ -101,6 +101,7 @@ export async function prepareAlarmChallenge(
     size: budget,
     newItemsRemainingToday: 0,
     allowedLevels: policy.allowedLevels,
+    levelShares: policy.shares,
     interests: profile.interests,
     // Being woken up is not "extra practice": allow recently seen difficult items too.
     extraPracticeGapMs: 0,

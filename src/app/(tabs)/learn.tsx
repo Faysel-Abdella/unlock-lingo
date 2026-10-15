@@ -35,6 +35,10 @@ export default function Learn() {
       </Card>
 
       <SectionHeader title="Explore" />
+      <Card onPress={() => router.push('/weekly-review')} accessibilityLabel="Weekly review">
+        <Text variant="bodyStrong">Weekly review</Text>
+        <Text tone="muted">Your week in numbers, and a short quiz on the words you found hardest.</Text>
+      </Card>
       <Card onPress={() => router.push('/vocabulary')} accessibilityLabel="Browse vocabulary">
         <Text variant="bodyStrong">Vocabulary</Text>
         <Text tone="muted">Browse every word, its status and when it is next due.</Text>

@@ -1,5 +1,5 @@
 import * as Haptics from 'expo-haptics';
-import { router } from 'expo-router';
+import { router, useLocalSearchParams } from 'expo-router';
 import { ActivityIndicator, View } from 'react-native';
 
 import { Button, EmptyState, IconButton, ProgressBar, Screen, StatTile, Text } from '@/components';
@@ -20,7 +20,9 @@ function spokenText(item: LearningItem): string | null {
 
 export default function SessionScreen() {
   const { colors, spacing } = useTheme();
-  const session = useLearningSession();
+  const { kind } = useLocalSearchParams<{ kind?: string }>();
+  const weekly = kind === 'weekly';
+  const session = useLearningSession(weekly ? 'weekly' : 'daily');
   const speak = usePronunciation();
   const invalidate = useInvalidateLearning();
   const autoPlay = useSettings().data?.autoPlayAudio ?? false;
@@ -75,8 +77,12 @@ export default function SessionScreen() {
         {header}
         <EmptyState
           icon="checkmark-done-outline"
-          title="You’re all caught up"
-          message="No reviews are due and today’s new words are done. Your next reviews will appear when they are due."
+          title={weekly ? 'Nothing to review this week' : 'You’re all caught up'}
+          message={
+            weekly
+              ? 'Practise during the week and your weekly review will collect what to revisit.'
+              : 'No reviews are due and today’s new words are done. Your next reviews will appear when they are due.'
+          }
           action={<Button label="Back to today" onPress={close} />}
         />
       </Screen>
@@ -89,8 +95,12 @@ export default function SessionScreen() {
       <Screen edges={['top', 'bottom']} footer={<Button label="Done" onPress={close} />}>
         {header}
         <View style={{ gap: spacing.sm, paddingTop: spacing.xl }}>
-          <Text variant="title">Session complete</Text>
-          <Text tone="muted">Every answer has been scheduled for review at the right time.</Text>
+          <Text variant="title">{weekly ? 'Weekly review complete' : 'Session complete'}</Text>
+          <Text tone="muted">
+            {weekly
+              ? 'Saved to your progress. Words you missed come back sooner next week.'
+              : 'Every answer has been scheduled for review at the right time.'}
+          </Text>
         </View>
         <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: spacing.md }}>
           <StatTile label="Moments" value={String(summary.interactions)} />
@@ -109,6 +119,7 @@ export default function SessionScreen() {
   if (!question || !item || !step) return null;
   const text = spokenText(item);
   const listen = text ? () => speak(text) : undefined;
+  const listenSlow = text ? () => speak(text, { slow: true }) : undefined;
   const save =
     item.type === 'vocabulary' ? () => void session.toggleSave(item.id, item.word) : undefined;
 
@@ -127,6 +138,7 @@ export default function SessionScreen() {
             item={item}
             actions={{
               onListen: listen,
+              onListenSlow: listenSlow,
               onSave: save,
               saved: session.savedIds.has(item.id),
               onKnow: () => void answerCard(true),
@@ -141,6 +153,7 @@ export default function SessionScreen() {
             question={question}
             autoPlay={autoPlay}
             onListen={speak}
+            onListenSlow={(text) => speak(text, { slow: true })}
             onAnswer={(correct, responseMs) => {
               void Haptics.notificationAsync(
                 correct ? Haptics.NotificationFeedbackType.Success : Haptics.NotificationFeedbackType.Error,

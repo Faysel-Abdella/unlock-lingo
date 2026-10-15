@@ -9,6 +9,7 @@ import {
 } from './personalVocabularyRepository';
 import { type ProfileRepository, createProfileRepository } from './profileRepository';
 import { type ProgressRepository, createProgressRepository } from './progressRepository';
+import { type WeeklyRepository, createWeeklyRepository } from './weeklyRepository';
 
 export interface Repositories {
   content: ContentRepository;
@@ -17,6 +18,7 @@ export interface Repositories {
   profile: ProfileRepository;
   activity: ActivityRepository;
   alarms: AlarmRepository;
+  weekly: WeeklyRepository;
 }
 
 export function createRepositories(db: Database): Repositories {
@@ -29,6 +31,7 @@ export function createRepositories(db: Database): Repositories {
     personal: createPersonalVocabularyRepository(db, content),
     profile: createProfileRepository(db),
     alarms: createAlarmRepository(db),
+    weekly: createWeeklyRepository(db),
   };
 }
 

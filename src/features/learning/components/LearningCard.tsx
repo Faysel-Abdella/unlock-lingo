@@ -6,6 +6,7 @@ import type { LearningItem } from '@/types/learning';
 
 export interface LearningCardActions {
   onListen?: () => void;
+  onListenSlow?: () => void;
   onKnow?: () => void;
   onReviewLater?: () => void;
   onSave?: () => void;
@@ -57,8 +58,8 @@ export function LearningCard({ item, actions }: { item: LearningItem; actions?: 
         </View>
       </View>
 
-      {item.type === 'vocabulary' ? <VocabularyBody item={item} onListen={actions?.onListen} /> : null}
-      {item.type === 'phrase' ? <PhraseBody item={item} onListen={actions?.onListen} /> : null}
+      {item.type === 'vocabulary' ? <VocabularyBody item={item} onListen={actions?.onListen} onListenSlow={actions?.onListenSlow} /> : null}
+      {item.type === 'phrase' ? <PhraseBody item={item} onListen={actions?.onListen} onListenSlow={actions?.onListenSlow} /> : null}
       {item.type === 'grammar' ? <GrammarBody item={item} /> : null}
 
       {actions?.onKnow || actions?.onReviewLater ? (
@@ -80,9 +81,19 @@ export function LearningCard({ item, actions }: { item: LearningItem; actions?: 
   );
 }
 
-function ListenButton({ onListen }: { onListen?: () => void }) {
+interface ListenProps {
+  onListen?: () => void;
+  onListenSlow?: () => void;
+}
+
+function ListenButton({ onListen, onListenSlow }: ListenProps) {
   if (!onListen) return null;
-  return <IconButton icon="volume-medium-outline" label="Listen" onPress={onListen} />;
+  return (
+    <View style={{ flexDirection: 'row' }}>
+      <IconButton icon="volume-medium-outline" label="Listen" onPress={onListen} />
+      {onListenSlow ? <IconButton icon="speedometer-outline" label="Listen slowly" onPress={onListenSlow} /> : null}
+    </View>
+  );
 }
 
 function Example({ text }: { text: string }) {
@@ -97,7 +108,7 @@ function Example({ text }: { text: string }) {
   );
 }
 
-function VocabularyBody({ item, onListen }: { item: Extract<LearningItem, { type: 'vocabulary' }>; onListen?: () => void }) {
+function VocabularyBody({ item, onListen, onListenSlow }: ListenProps & { item: Extract<LearningItem, { type: 'vocabulary' }> }) {
   const { colors, spacing } = useTheme();
   const meta = [item.pronunciation, item.partOfSpeech].filter(Boolean).join('  ·  ');
   return (
@@ -112,7 +123,7 @@ function VocabularyBody({ item, onListen }: { item: Extract<LearningItem, { type
               {meta}
             </Text>
           ) : null}
-          <ListenButton onListen={onListen} />
+          <ListenButton onListen={onListen} onListenSlow={onListenSlow} />
         </View>
       </View>
       <View style={{ height: 1, backgroundColor: colors.border }} />
@@ -129,7 +140,7 @@ function VocabularyBody({ item, onListen }: { item: Extract<LearningItem, { type
   );
 }
 
-function PhraseBody({ item, onListen }: { item: Extract<LearningItem, { type: 'phrase' }>; onListen?: () => void }) {
+function PhraseBody({ item, onListen, onListenSlow }: ListenProps & { item: Extract<LearningItem, { type: 'phrase' }> }) {
   const { spacing } = useTheme();
   return (
     <View style={{ gap: spacing.md }}>
@@ -137,7 +148,7 @@ function PhraseBody({ item, onListen }: { item: Extract<LearningItem, { type: 'p
         <Text variant="title" align="center" accessibilityRole="header">
           {item.phrase}
         </Text>
-        <ListenButton onListen={onListen} />
+        <ListenButton onListen={onListen} onListenSlow={onListenSlow} />
       </View>
       <Text variant="bodyLarge">{item.meaning}</Text>
       <Example text={item.example} />

@@ -101,6 +101,7 @@ export async function prepareSession(
     size,
     newItemsRemainingToday: Math.max(0, settings.newItemsPerDay - day.newItems),
     allowedLevels: levelPolicy.allowedLevels,
+    levelShares: levelPolicy.shares,
     interests: profile.interests,
   });
 

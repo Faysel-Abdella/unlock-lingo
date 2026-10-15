@@ -62,6 +62,7 @@ export async function buildDeck(
       size: DECK_SIZE,
       newItemsRemainingToday: Math.max(0, settings.newItemsPerDay - day.newItems),
       allowedLevels: policy.allowedLevels,
+      levelShares: policy.shares,
       interests: profile.interests,
     },
   );

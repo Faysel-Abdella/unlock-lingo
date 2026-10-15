@@ -28,6 +28,11 @@ export interface QueueOptions {
   newItemsRemainingToday: number;
   /** Levels new seed content may come from, preferred first. Personal words ignore this. */
   allowedLevels: readonly CefrLevel[];
+  /**
+   * Optional share of new items per level (from the level policy). When given,
+   * levels are mixed by share instead of exhausting the first level first.
+   */
+  levelShares?: Partial<Record<CefrLevel, number>>;
   interests: readonly string[];
   /** Maximum share of a session given to new items when reviews exist. */
   maxNewRatio?: number;
@@ -54,8 +59,18 @@ function isDifficult(c: QueueCandidate): boolean {
   return c.progress?.status === 'difficult' || c.personal?.isDifficult === true;
 }
 
-function hasFailedBefore(c: QueueCandidate): boolean {
-  return (c.progress?.lapses ?? 0) > 0 || c.progress?.lastRating === 1 || (c.progress?.incorrectCount ?? 0) > 0;
+/** A correct streak this long means a past failure has been overcome. */
+export const RECOVERED_STREAK = 2;
+
+/**
+ * Previously failed and not yet recovered. Items failed long ago but answered
+ * correctly since are not offered as extra practice (no unnecessarily easy material).
+ */
+function needsFailurePractice(c: QueueCandidate): boolean {
+  const p = c.progress;
+  if (!p) return false;
+  const failed = p.lapses > 0 || p.lastRating === 1 || p.incorrectCount > 0;
+  return failed && (p.lastRating === 1 || p.streak < RECOVERED_STREAK);
 }
 
 function seenRecently(c: QueueCandidate, now: number, gapMs: number): boolean {
@@ -148,7 +163,7 @@ export function buildQueue(candidates: readonly QueueCandidate[], opts: QueueOpt
     .sort((a, b) => (b.progress?.difficulty ?? 0) - (a.progress?.difficulty ?? 0));
   const difficultIds = new Set(difficult.map((c) => c.itemId));
   const failed = notDueReviewed
-    .filter((c) => !difficultIds.has(c.itemId) && hasFailedBefore(c))
+    .filter((c) => !difficultIds.has(c.itemId) && needsFailurePractice(c))
     .sort((a, b) => (a.progress?.lastReviewedAt ?? 0) - (b.progress?.lastReviewedAt ?? 0));
 
   const fresh = eligible
@@ -173,8 +188,48 @@ export function buildQueue(candidates: readonly QueueCandidate[], opts: QueueOpt
   const newTake = Math.min(newAllowance, size - reviewTake);
 
   const reviews = reviewPool.slice(0, reviewTake);
-  const news = fresh.slice(0, newTake).map((c) => ({ itemId: c.itemId, reason: 'new' as const }));
+  const orderedFresh = opts.levelShares ? mixByLevel(fresh, opts.levelShares) : fresh;
+  const news = orderedFresh.slice(0, newTake).map((c) => ({ itemId: c.itemId, reason: 'new' as const }));
   return interleave(reviews, news);
+}
+
+/**
+ * Reorders new items so levels appear in proportion to their share: personal
+ * words stay first, then each slot goes to the level furthest behind its share
+ * (largest-deficit rounding), keeping each level's internal order.
+ */
+export function mixByLevel(
+  fresh: readonly QueueCandidate[],
+  shares: Partial<Record<CefrLevel, number>>,
+): QueueCandidate[] {
+  const personal = fresh.filter((c) => c.personal !== null);
+  const pools = new Map<CefrLevel, QueueCandidate[]>();
+  for (const c of fresh) {
+    if (c.personal !== null) continue;
+    if (!(shares[c.cefrLevel] ?? 0)) continue;
+    pools.set(c.cefrLevel, [...(pools.get(c.cefrLevel) ?? []), c]);
+  }
+  const taken = new Map<CefrLevel, number>();
+  const result: QueueCandidate[] = [];
+  const total = [...pools.values()].reduce((n, p) => n + p.length, 0);
+  for (let k = 1; result.length < total; k++) {
+    let best: CefrLevel | null = null;
+    let bestDeficit = -Infinity;
+    for (const [level, pool] of pools) {
+      const used = taken.get(level) ?? 0;
+      if (used >= pool.length) continue;
+      const deficit = (shares[level] ?? 0) * k - used;
+      if (deficit > bestDeficit) {
+        bestDeficit = deficit;
+        best = level;
+      }
+    }
+    if (best === null) break;
+    const used = taken.get(best) ?? 0;
+    result.push((pools.get(best) as QueueCandidate[])[used] as QueueCandidate);
+    taken.set(best, used + 1);
+  }
+  return [...personal, ...result];
 }
 
 /** Number of reviews currently due, used for dashboard counts and backlog gating. */

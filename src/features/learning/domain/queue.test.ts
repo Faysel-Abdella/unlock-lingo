@@ -1,7 +1,7 @@
 import type { LearningProgress } from '@/types/learning';
 
 import { DAY_MS } from './fsrs';
-import { type QueueCandidate, type QueueOptions, buildQueue, countDue } from './queue';
+import { type QueueCandidate, type QueueOptions, buildQueue, countDue, mixByLevel } from './queue';
 import { emptyProgress } from './review';
 
 const NOW = Date.UTC(2026, 3, 10, 12);
@@ -166,5 +166,33 @@ describe('countDue', () => {
     expect(
       countDue([candidate('a', reviewed()), candidate('b', reviewed({ dueAt: NOW + DAY_MS })), candidate('c', null)], NOW),
     ).toBe(1);
+  });
+});
+
+describe('gradual level mixing', () => {
+  const b1 = Array.from({ length: 20 }, (_, i) => candidate(`b1-${i}`, null, { cefrLevel: 'B1' }));
+  const b2 = Array.from({ length: 20 }, (_, i) => candidate(`b2-${i}`, null, { cefrLevel: 'B2' }));
+
+  it('mixes the next level in by share instead of waiting for the current level to run out', () => {
+    const queue = buildQueue([...b1, ...b2], opts({ size: 8, allowedLevels: ['B1', 'B2'], levelShares: { B1: 0.75, B2: 0.25 } }));
+    const fromB2 = queue.filter((e) => e.itemId.startsWith('b2-')).length;
+    expect(fromB2).toBe(2);
+    expect(queue).toHaveLength(8);
+  });
+
+  it('keeps personal words first and ignores levels with no share', () => {
+    const mine = candidate('mine', null, { cefrLevel: 'C1', personal: { isImportant: false, isDifficult: false, isMastered: false } });
+    const ordered = mixByLevel([...b1.slice(0, 2), ...b2.slice(0, 2), mine], { B1: 1 });
+    expect(ordered.map((c) => c.itemId)).toEqual(['mine', 'b1-0', 'b1-1']);
+  });
+});
+
+describe('no unnecessarily easy extra practice', () => {
+  it('stops offering a once-failed item as extra practice after it has been answered correctly twice in a row', () => {
+    const recovered = candidate('recovered', reviewed({ dueAt: NOW + 5 * DAY_MS, lapses: 1, streak: 4, lastRating: 3, lastReviewedAt: NOW - DAY_MS }));
+    const shaky = candidate('shaky', reviewed({ dueAt: NOW + 5 * DAY_MS, lapses: 1, streak: 1, lastRating: 3, lastReviewedAt: NOW - DAY_MS }));
+    const justFailed = candidate('just-failed', reviewed({ dueAt: NOW + DAY_MS, incorrectCount: 1, streak: 0, lastRating: 1, lastReviewedAt: NOW - DAY_MS }));
+    const queue = buildQueue([recovered, shaky, justFailed], opts());
+    expect(queue.map((e) => e.itemId).sort()).toEqual(['just-failed', 'shaky']);
   });
 });

@@ -53,10 +53,38 @@ export interface AlarmRepository {
   recordFired(alarmId: string, firedAt: number): Promise<number>;
   recordSnoozed(historyId: number): Promise<void>;
   recordOutcome(historyId: number, outcome: AlarmOutcome): Promise<void>;
+  /** The latest entry for an alarm that has not been dismissed yet. */
+  findOpenEntry(alarmId: string): Promise<AlarmHistoryEntry | null>;
+  closeEntry(historyId: number, dismissedAt: number, method: DismissMethod): Promise<void>;
+  setQuestionCounts(historyId: number, answered: number, correct: number): Promise<void>;
   recentHistory(limit?: number): Promise<AlarmHistoryEntry[]>;
 }
 
 const stringList = z.array(z.string());
+
+interface HistoryRow {
+  id: number;
+  alarm_id: string | null;
+  fired_at: number;
+  dismissed_at: number | null;
+  dismiss_method: DismissMethod | null;
+  snooze_count: number;
+  questions_answered: number;
+  questions_correct: number;
+}
+
+function historyFromRow(r: HistoryRow): AlarmHistoryEntry {
+  return {
+    id: r.id,
+    alarmId: r.alarm_id,
+    firedAt: r.fired_at,
+    dismissedAt: r.dismissed_at,
+    dismissMethod: r.dismiss_method,
+    snoozeCount: r.snooze_count,
+    questionsAnswered: r.questions_answered,
+    questionsCorrect: r.questions_correct,
+  };
+}
 
 function fromRow(row: AlarmRow): Alarm {
   return {
@@ -162,26 +190,33 @@ export function createAlarmRepository(db: Database): AlarmRepository {
     },
 
     async recentHistory(limit = 30) {
-      const rows = await db.getAllAsync<{
-        id: number;
-        alarm_id: string | null;
-        fired_at: number;
-        dismissed_at: number | null;
-        dismiss_method: DismissMethod | null;
-        snooze_count: number;
-        questions_answered: number;
-        questions_correct: number;
-      }>('SELECT * FROM alarm_history ORDER BY fired_at DESC LIMIT ?', [limit]);
-      return rows.map((r) => ({
-        id: r.id,
-        alarmId: r.alarm_id,
-        firedAt: r.fired_at,
-        dismissedAt: r.dismissed_at,
-        dismissMethod: r.dismiss_method,
-        snoozeCount: r.snooze_count,
-        questionsAnswered: r.questions_answered,
-        questionsCorrect: r.questions_correct,
-      }));
+      const rows = await db.getAllAsync<HistoryRow>('SELECT * FROM alarm_history ORDER BY fired_at DESC, id DESC LIMIT ?', [
+        limit,
+      ]);
+      return rows.map(historyFromRow);
+    },
+
+    async findOpenEntry(alarmId) {
+      const row = await db.getFirstAsync<HistoryRow>(
+        'SELECT * FROM alarm_history WHERE alarm_id = ? AND dismissed_at IS NULL ORDER BY fired_at DESC, id DESC LIMIT 1',
+        [alarmId],
+      );
+      return row ? historyFromRow(row) : null;
+    },
+
+    async closeEntry(historyId, dismissedAt, method) {
+      await db.runAsync(
+        'UPDATE alarm_history SET dismissed_at = ?, dismiss_method = ? WHERE id = ? AND dismissed_at IS NULL',
+        [dismissedAt, method, historyId],
+      );
+    },
+
+    async setQuestionCounts(historyId, answered, correct) {
+      await db.runAsync('UPDATE alarm_history SET questions_answered = ?, questions_correct = ? WHERE id = ?', [
+        answered,
+        correct,
+        historyId,
+      ]);
     },
   };
 }

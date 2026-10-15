@@ -103,13 +103,14 @@ src/
     unlock/               unlockService (card deck, native sync, event import), hooks
     reviews/domain/       PURE TS: review week window, weekly stats, weekly quiz selection
     reviews/              weeklyService (load, prepare quiz, save snapshot), hooks
-    audio/domain/         PURE TS: TTS voice selection, slow rate
+    audio/domain/         PURE TS: TTS voice selection, slow rate, pronunciation scoring
+    audio/                pronunciation practice service, hook and SpeakCard
     progress/domain/      PURE TS: weekly trends, level-mix description, smart-difficulty status
     vocabulary/ settings/ onboarding/ progress/   feature hooks and components
   repositories/           SQL lives here only. One repository per aggregate, plus row mappers
   services/
     database/             Database interface, migrations, versioned seed content, test adapter
-    audio/                PronunciationService (TTS with best-voice selection), SpeechRecognitionProvider (null for now)
+    audio/                PronunciationService (TTS with best-voice selection), SpeechRecognitionProvider (expo-speech-recognition)
     ai/                   AIContentProvider interface + offline default
   native/                 typed bridges to native modules, with no-op fallbacks
   hooks/                  repositories context, query keys, pronunciation, date
@@ -192,8 +193,28 @@ imports.
   quality, then offline voices ahead of network ones. The choice is cached per locale.
 - "Listen slowly" replays at 60% of your speech rate (minimum 0.4) on cards and listening
   questions.
-- `SpeechRecognitionProvider` defines the interface for future pronunciation practice. The
-  default implementation reports itself as unavailable.
+
+### Speaking practice
+
+Opt-in under Settings → Audio, because it needs the microphone.
+
+- **In sessions.** Up to three "Say it out loud" steps per daily session, each right after an
+  item's first quiz. Only words and phrases of up to five words qualify. You get up to three
+  attempts, with Listen and Listen slowly. Speaking steps never re-queue an item or count as
+  missed.
+- **Anywhere.** Word detail screens have "Practise saying it".
+- **Scoring.** Recogniser hypotheses are compared with the target text, ignoring case, accents
+  and punctuation, and accepting the target inside a longer utterance. An exact match is
+  "clear"; ≥ 75% similarity (edit distance) is "close", usually recognition noise; anything
+  else is "unclear" and shows what was heard. The recogniser is not biased towards the expected
+  word, so a mispronunciation isn't silently corrected into a match.
+- **Practice only.** Attempts are stored in `pronunciation_attempts`, separate from FSRS history,
+  and never change when a word comes back: recognisers mishear accents and noisy rooms.
+  Progress shows how many attempts were understood and which words to practise again.
+- **Engine.** `expo-speech-recognition` uses Android's `SpeechRecognizer`, on-device when that
+  language's offline model is installed (otherwise the system recogniser, which may use the
+  network). The provider sits behind `SpeechRecognitionProvider`, with a null implementation
+  for devices without a recogniser.
 
 ## Database schema
 
@@ -212,6 +233,7 @@ a new one.
 | `review_history` | Every answer with exercise type, rating, response time, context (`session`, `unlock`, `alarm`, `weekly`) and before/after scheduling state |
 | `personal_vocabulary` | My Words: links to a learning item, plus context note, source and important/difficult/mastered flags, and enrichment status |
 | `daily_activity` | Per-day counters: interactions, correct, incorrect, new, reviews, grammar, unlock cards, alarm challenges |
+| `pronunciation_attempts` | Speaking practice: expected text, what was heard, similarity and verdict (migration 2). Never affects scheduling. |
 | `weekly_stats` | One snapshot per completed weekly review (JSON, validated with Zod), keyed by week start |
 | `alarms` / `alarm_history` | Alarm definitions, and every ring: fired time, snoozes, how it was dismissed (`challenge`, `emergency`, `timeout`), questions answered/correct |
 
@@ -228,6 +250,7 @@ optionally through an `AIContentProvider` later. Until then it is reviewed as a 
 
 | Permission | Declared by | Why |
 | ---------- | ----------- | --- |
+| `RECORD_AUDIO` | expo-speech-recognition | Only while you practise saying a word (opt-in). Requested when you turn on speaking practice. |
 | `INTERNET` | Expo | Development client only (connecting to Metro). The app itself works offline. |
 | `VIBRATE` | expo-haptics, alarm module | Haptic feedback; alarm vibration |
 | `POST_NOTIFICATIONS` | alarm, unlock-cards modules | Alarms and learning cards are notifications. Requested at runtime (Android 13+) when you save an alarm or turn on unlock learning. |
@@ -384,9 +407,9 @@ classes. Card delivery still has to be checked on a device:
   volume ramp, and a wheel-style time picker.
 - **Phase 3 follow-ups:** device testing (checklist above), a home-screen widget as a further
   low-interruption option, and Listen directly from the notification.
-- **Phase 4 follow-ups:** prerecorded audio for seed content, a pronunciation exercise built on
-  an on-device `SpeechRecognitionProvider`, a weekly-review reminder notification, and charts
-  over longer periods.
+- **Phase 4 follow-ups:** prerecorded audio for seed content, a weekly-review reminder
+  notification, charts over longer periods, and offering the offline speech model download
+  (`androidTriggerOfflineModelDownload`) from settings.
 - **Phase 5:** concrete `AIContentProvider` implementations: enrich My Words, write
   interest-tailored examples, generate exercises, explain mistakes. Always optional and
   replaceable.

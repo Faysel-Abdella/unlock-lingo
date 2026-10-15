@@ -81,8 +81,8 @@ non-Android platforms and tests.
   - Grammar: `grammar_choice`.
   - Phrase: `phrase_meaning`.
   - Unseen items get an `intro` card.
-  - Pronunciation (speech recognition) and sentence correction are reserved enum values for later
-    phases.
+  - `pronunciation`: optional speaking practice judged by a speech recogniser. It is stored
+    separately and never changes FSRS state. `sentence_correction` is still reserved.
 - **FSRS-5 scheduler.** Default 19 weights, desired retention 0.9, and a maximum interval of 365
   days. Short learning steps keep same-day repetition alive. Same-day reviews use FSRS-5's
   short-term stability formula. Answers map to ratings: wrong → Again, correct but slow → Hard,
@@ -144,6 +144,10 @@ personal_vocabulary id PK, item_id→learning_items (UNIQUE), word, context_note
 daily_activity      date PK, interactions, correct, incorrect, new_items, reviews,
                     grammar_answered, unlock_cards_shown, alarm_challenges, updated_at
 weekly_stats        week_start PK, snapshot(JSON), created_at                (Phase 4)
+
+-- migration 2
+pronunciation_attempts  id PK, item_id, expected, heard, similarity, verdict(clear|close|unclear),
+                    attempted_at                         (speaking practice; never affects FSRS)
 
 alarms              id PK, label, hour, minute, days_mask(bit0=Mon), enabled, question_count,
                     challenge_types(JSON), snooze_enabled, snooze_minutes, max_snoozes, vibrate,

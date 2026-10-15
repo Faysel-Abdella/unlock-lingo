@@ -11,6 +11,7 @@ export const queryKeys = {
   progress: (day: string) => ['learning', 'progress', day] as const,
   weekly: (day: string) => ['learning', 'weekly', day] as const,
   weeklyHistory: ['learning', 'weeklyHistory'] as const,
+  pronunciation: ['learning', 'pronunciation'] as const,
   vocabulary: (search: string, level: string | null) => ['learning', 'vocabulary', search, level] as const,
   item: (id: string) => ['learning', 'item', id] as const,
   personalWords: ['learning', 'personal'] as const,

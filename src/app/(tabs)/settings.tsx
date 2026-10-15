@@ -6,6 +6,7 @@ import { Button, Card, Chip, Screen, SectionHeader, Text } from '@/components';
 import { SettingRow, Stepper, ToggleRow } from '@/features/settings/components';
 import { useProfile, useResetProgress, useSaveProfile, useSettings, useUpdateSettings } from '@/features/settings/hooks';
 import type { AppSettings, UserProfile } from '@/features/settings/schema';
+import { speechRecognitionProvider } from '@/services/audio/speechRecognition';
 import { useTheme } from '@/theme/ThemeProvider';
 import {
   CEFR_LEVELS,
@@ -179,6 +180,20 @@ function SettingsForm({ settings, profile }: { settings: AppSettings; profile: U
           hint="Speak the word when a question with audio appears."
           value={settings.autoPlayAudio}
           onChange={(v) => set({ autoPlayAudio: v })}
+        />
+        <ToggleRow
+          label="Speaking practice"
+          hint={
+            speechRecognitionProvider.isAvailable()
+              ? 'Say a few words aloud in each session. Practice only: it never changes when words come back.'
+              : 'Speech recognition is not available on this device.'
+          }
+          value={settings.speakingPractice && speechRecognitionProvider.isAvailable()}
+          onChange={(enabled) => {
+            if (!speechRecognitionProvider.isAvailable()) return;
+            if (!enabled) set({ speakingPractice: false });
+            else void speechRecognitionProvider.requestPermission().then((granted) => set({ speakingPractice: granted }));
+          }}
         />
       </Card>
 

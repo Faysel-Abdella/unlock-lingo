@@ -2,6 +2,7 @@ import { useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
 
 import { EmptyState, Screen, Text } from '@/components';
+import { PracticeSpeaking } from '@/features/audio/components/PracticeSpeaking';
 import { LearningCard } from '@/features/learning/components/LearningCard';
 import { useItem } from '@/features/learning/hooks';
 import { useProfile } from '@/features/settings/hooks';
@@ -47,6 +48,7 @@ export default function ItemDetail() {
           {LANGUAGES[nativeLanguage].name}: <Text variant="bodyStrong">{translation}</Text>
         </Text>
       ) : null}
+      <PracticeSpeaking item={item} />
       <ItemProgressCard progress={progress} flags={personal?.flags ?? null} now={now} />
     </Screen>
   );

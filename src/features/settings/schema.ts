@@ -19,6 +19,8 @@ export const appSettingsSchema = z.object({
   /** Text-to-speech rate (1 = normal). */
   speechRate: setting(z.number().min(0.5).max(1.5), 0.9),
   autoPlayAudio: setting(z.boolean(), false),
+  /** Optional "say it" steps in sessions. Off by default because it needs the microphone. */
+  speakingPractice: setting(z.boolean(), false),
   /** 0 = Sunday … 6 = Saturday. */
   weeklyReviewDay: setting(z.number().int().min(0).max(6), 0),
   /** Unlock learning cards. Falls back to safe defaults (off) if stored data is invalid. */

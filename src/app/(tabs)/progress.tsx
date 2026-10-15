@@ -97,6 +97,31 @@ export default function ProgressScreen() {
         ) : null}
       </Card>
 
+      {data.speaking.attempts > 0 ? (
+        <>
+          <SectionHeader title="Speaking practice" />
+          <Card>
+            <Text variant="bodyStrong">
+              {data.speaking.clear} of {data.speaking.attempts} attempts understood clearly
+            </Text>
+            <Text variant="caption" tone="muted">
+              Last 30 days. Speaking is practice only and never changes when words come back.
+            </Text>
+            {data.speaking.needsPractice.length > 0 ? (
+              <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm }}>
+                {data.speaking.needsPractice.map((item) => (
+                  <Chip
+                    key={item.itemId}
+                    label={item.expected}
+                    onPress={() => router.push({ pathname: '/vocabulary/[id]', params: { id: item.itemId } })}
+                  />
+                ))}
+              </View>
+            ) : null}
+          </Card>
+        </>
+      ) : null}
+
       {history.length > 0 ? (
         <>
           <SectionHeader title="Weekly reviews" />

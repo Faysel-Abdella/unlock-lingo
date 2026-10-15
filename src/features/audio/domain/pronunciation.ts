@@ -1,3 +1,5 @@
+import type { LearningItem } from '@/types/learning';
+
 /** One recogniser hypothesis. */
 export interface Hypothesis {
   transcript: string;
@@ -79,4 +81,10 @@ export function scorePronunciation(expected: string, hypotheses: readonly Hypoth
 export function isSpeakable(text: string): boolean {
   const words = normalizeSpeech(text).split(' ').filter(Boolean);
   return words.length > 0 && words.length <= MAX_SPEAKABLE_WORDS;
+}
+
+/** The text a learner would say for an item, or null when it is not suited to speaking practice. */
+export function speakableText(item: LearningItem): string | null {
+  const text = item.type === 'vocabulary' ? item.word : item.type === 'phrase' ? item.phrase : null;
+  return text && isSpeakable(text) ? text : null;
 }

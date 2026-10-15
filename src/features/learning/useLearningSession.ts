@@ -1,14 +1,24 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 
+import { speakableText } from '@/features/audio/domain/pronunciation';
 import { useProfile, useSettings } from '@/features/settings/hooks';
 import { useRepositories } from '@/hooks/useRepositories';
 import { completeWeeklyReview, loadWeeklyReview, prepareWeeklySession } from '@/features/reviews/weeklyService';
 import type { WeeklyStats } from '@/features/reviews/domain/weekly';
+import { speechRecognitionProvider } from '@/services/audio/speechRecognition';
 import type { ExerciseType, ReviewContext } from '@/types/learning';
 
 import { type Question, generateQuestion, introCard } from './domain/exercises';
 import type { AnswerOutcome } from './domain/review';
-import { type SessionState, answerStep, currentStep, isComplete, skipStep, summarize } from './domain/session';
+import {
+  type SessionState,
+  addSpeakingPractice,
+  answerStep,
+  currentStep,
+  isComplete,
+  skipStep,
+  summarize,
+} from './domain/session';
 import { type PreparedSession, prepareSession } from './learningService';
 
 export type SessionPhase = 'loading' | 'empty' | 'active' | 'done' | 'error';
@@ -58,7 +68,9 @@ export function useLearningSession(kind: SessionKind = 'daily') {
     prepare()
       .then((p) => {
         setPrepared(p);
-        setSession(p.state);
+        // Speaking practice is opt-in and only part of the daily session.
+        const speaking = kind === 'daily' && settings.speakingPractice && speechRecognitionProvider.isAvailable();
+        setSession(speaking ? addSpeakingPractice(p.state, (id) => !!p.items[id] && speakableText(p.items[id]) !== null) : p.state);
         setLastTypes(p.lastExerciseTypes);
         setSavedIds(new Set(p.personalItemIds));
       })
@@ -70,7 +82,7 @@ export function useLearningSession(kind: SessionKind = 'daily') {
   const question: Question | null = useMemo(() => {
     if (!step || !prepared) return null;
     const item = prepared.items[step.itemId];
-    if (!item) return null;
+    if (!item || step.mode === 'speak') return null;
     if (step.mode === 'intro') return introCard(item);
     return generateQuestion(item, {
       pool: prepared.pool,
@@ -127,6 +139,11 @@ export function useLearningSession(kind: SessionKind = 'daily') {
     setPending(null);
   }
 
+  /** Ends a speaking step. It is practice only: nothing is written to the learning schedule. */
+  function completeSpeaking(clear: boolean) {
+    advance({ correct: clear, exerciseType: 'pronunciation' });
+  }
+
   async function toggleSave(itemId: string, word: string) {
     if (savedIds.has(itemId) || !profile) return;
     await repos.personal.add(
@@ -148,6 +165,7 @@ export function useLearningSession(kind: SessionKind = 'daily') {
     savedIds,
     record,
     advance,
+    completeSpeaking,
     toggleSave,
   };
 }

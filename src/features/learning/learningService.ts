@@ -1,5 +1,6 @@
 import type { Repositories } from '@/repositories';
 import type { LevelTotals } from '@/repositories/contentRepository';
+import type { PronunciationStats } from '@/repositories/pronunciationRepository';
 import type { AppSettings, UserProfile } from '@/features/settings/schema';
 import type { LearningItem, LearningStatus } from '@/types/learning';
 import { type DateKey, addDays, toDateKey } from '@/utils/date';
@@ -153,6 +154,8 @@ export interface ProgressOverview {
   /** Quiz accuracy per level over the smart-difficulty window. */
   levelAccuracy: LevelAccuracy[];
   levelPolicy: LevelPolicy;
+  /** Speaking practice over the smart-difficulty window. */
+  speaking: PronunciationStats;
   difficultItems: { id: string; label: string }[];
 }
 
@@ -168,12 +171,13 @@ export async function loadProgressOverview(
   now: number,
 ): Promise<ProgressOverview> {
   const today = toDateKey(now);
-  const [week, candidates, streak, levels, levelAccuracy] = await Promise.all([
+  const [week, candidates, streak, levels, levelAccuracy, speaking] = await Promise.all([
     repos.activity.getRange(addDays(today, -6), today),
     repos.progress.getQueueCandidates(profile.targetLanguage),
     getStreak(repos, today),
     repos.content.levelTotals(profile.targetLanguage),
     repos.progress.getLevelAccuracy(profile.targetLanguage, now - LEVEL_WINDOW_MS),
+    repos.pronunciation.stats(profile.targetLanguage, now - LEVEL_WINDOW_MS),
   ]);
   const difficultIds = candidates
     .filter((c) => effectiveStatus(c.progress?.status ?? 'new', c.personal) === 'difficult')
@@ -192,6 +196,7 @@ export async function loadProgressOverview(
     levels,
     levelAccuracy,
     levelPolicy: computeLevelPolicy(profile.currentLevel, profile.targetLevel, levelAccuracy),
+    speaking,
     difficultItems,
   };
 }

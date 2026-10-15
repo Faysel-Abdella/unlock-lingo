@@ -1,7 +1,7 @@
 import { router } from 'expo-router';
 import { View } from 'react-native';
 
-import { Card, Chip, ProgressBar, Screen, SectionHeader, StatTile, Text } from '@/components';
+import { Card, Chip, ProgressBar, Screen, SectionHeader, StatGrid, Text } from '@/components';
 import { accuracy } from '@/features/learning/domain/stats';
 import { useProgressOverview } from '@/features/learning/hooks';
 import { WeekChart } from '@/features/progress/WeekChart';
@@ -28,18 +28,16 @@ export default function ProgressScreen() {
         <WeekChart days={data.week} goal={goal} />
       </Card>
 
-      <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: spacing.md }}>
-        <StatTile label="Today" value={String(today?.interactions ?? 0)} hint="moments" />
-        <StatTile label="This week" value={String(data.weekTotals.interactions)} hint="moments" />
-        <StatTile
-          label="Accuracy"
-          value={weekAccuracy === null ? '–' : `${Math.round(weekAccuracy * 100)}%`}
-          hint="this week"
-        />
-        <StatTile label="Streak" value={String(data.streak.current)} hint={`best ${data.streak.longest}`} />
-        <StatTile label="Mastered" value={String(data.statusCounts.mastered)} hint="items" />
-        <StatTile label="Difficult" value={String(data.statusCounts.difficult)} hint="items" />
-      </View>
+      <StatGrid
+        stats={[
+          { label: 'Today', value: String(today?.interactions ?? 0), hint: 'moments' },
+          { label: 'This week', value: String(data.weekTotals.interactions), hint: 'moments' },
+          { label: 'Accuracy', value: weekAccuracy === null ? '–' : `${Math.round(weekAccuracy * 100)}%`, hint: 'this week' },
+          { label: 'Streak', value: String(data.streak.current), hint: `best ${data.streak.longest}` },
+          { label: 'Mastered', value: String(data.statusCounts.mastered), hint: 'items' },
+          { label: 'Difficult', value: String(data.statusCounts.difficult), hint: 'items' },
+        ]}
+      />
 
       <SectionHeader title="Level progress" />
       <Card>

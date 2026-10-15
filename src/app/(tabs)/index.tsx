@@ -3,11 +3,11 @@ import { router } from 'expo-router';
 import { useState } from 'react';
 import { View } from 'react-native';
 
-import { Button, Card, ProgressBar, Screen, StatTile, Text } from '@/components';
+import { Button, Card, ListGroup, ListRow, Screen, SectionHeader, SegmentedProgress, StatGrid, Text } from '@/components';
 import { describeRepeat, describeTimeUntil, formatAlarmTime } from '@/features/alarms/domain/schedule';
 import { useNextAlarm } from '@/features/alarms/hooks';
 import { useDashboard } from '@/features/learning/hooks';
-import { useProfile, useSaveProfile } from '@/features/settings/hooks';
+import { useProfile, useSaveProfile, useSettings } from '@/features/settings/hooks';
 import { useTheme } from '@/theme/ThemeProvider';
 
 function greeting(hour: number): string {
@@ -17,53 +17,84 @@ function greeting(hour: number): string {
 }
 
 export default function Dashboard() {
-  const { colors, spacing } = useTheme();
+  const { colors, radius, spacing } = useTheme();
   const { data } = useDashboard();
   const profile = useProfile().data;
+  const unlock = useSettings().data?.unlock;
   const saveProfile = useSaveProfile();
   const [now] = useState(Date.now);
   const nextAlarm = useNextAlarm(now);
 
   if (!data) return <Screen>{null}</Screen>;
 
-  const { today, dailyGoal, dueCount, streak, levelPolicy } = data;
+  const { today, dailyGoal, dueCount, streak, levelPolicy, newRemainingToday } = data;
   const answered = today.correct + today.incorrect;
   const accuracy = answered === 0 ? '–' : `${Math.round((today.correct / answered) * 100)}%`;
   const date = new Date(now);
   const suggested = levelPolicy.suggestedLevel;
+  const goalReached = today.interactions >= dailyGoal;
 
   return (
     <Screen>
-      <View style={{ gap: spacing.xs }}>
-        <Text variant="caption" tone="muted">
-          {date.toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric' })}
-        </Text>
-        <Text variant="title">{greeting(date.getHours())}</Text>
+      <View style={{ flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', gap: spacing.md }}>
+        <View style={{ flex: 1, gap: spacing.xs }}>
+          <Text variant="label" tone="subtle">
+            {date.toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric' })}
+          </Text>
+          <Text variant="title" accessibilityRole="header">
+            {greeting(date.getHours())}
+          </Text>
+        </View>
+        <View
+          accessible
+          accessibilityLabel={`${streak.current} day streak`}
+          style={{
+            flexDirection: 'row',
+            alignItems: 'center',
+            gap: spacing.xs,
+            backgroundColor: colors.warningSoft,
+            borderRadius: radius.pill,
+            paddingHorizontal: spacing.md,
+            paddingVertical: spacing.xs + 2,
+          }}
+        >
+          <Ionicons name="flame" size={16} color={colors.warning} />
+          <Text variant="captionStrong" tone="warning">
+            {streak.current} {streak.current === 1 ? 'day' : 'days'}
+          </Text>
+        </View>
       </View>
 
-      <Card>
-        <Text variant="label" tone="subtle">
-          Today
-        </Text>
-        <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: spacing.xs }}>
-          <Text variant="stat">{today.interactions}</Text>
-          <Text tone="muted">/ {dailyGoal} micro lessons</Text>
+      <View style={{ gap: spacing.md, paddingVertical: spacing.sm }}>
+        <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: spacing.sm }}>
+          <Text variant="display">{today.interactions}</Text>
+          <Text variant="bodyLarge" tone="muted">
+            of {dailyGoal} micro lessons today
+          </Text>
         </View>
-        <ProgressBar value={today.interactions / dailyGoal} />
+        <SegmentedProgress done={today.interactions} goal={dailyGoal} label={`${today.interactions} of ${dailyGoal} micro lessons`} />
+        <Text variant="caption" tone="muted">
+          {goalReached
+            ? 'Daily goal reached. Anything more is a bonus.'
+            : dueCount > 0
+              ? `${dueCount} ${dueCount === 1 ? 'review is' : 'reviews are'} due · ${newRemainingToday} new words available`
+              : `Nothing due · ${newRemainingToday} new words available`}
+        </Text>
         <Button
           label={dueCount > 0 ? `Review ${dueCount} due` : 'Start today’s learning'}
           icon="play"
           onPress={() => router.push('/session')}
-          style={{ marginTop: spacing.sm }}
         />
-      </Card>
-
-      <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: spacing.md }}>
-        <StatTile label="Reviewed" value={String(today.reviews)} hint="words today" />
-        <StatTile label="Accuracy" value={accuracy} hint="today" />
-        <StatTile label="Streak" value={`${streak.current}`} hint={streak.current === 1 ? 'day' : 'days'} />
-        <StatTile label="Due" value={String(dueCount)} hint="for review" />
       </View>
+
+      <StatGrid
+        stats={[
+          { label: 'Reviewed', value: String(today.reviews), hint: 'words today' },
+          { label: 'Accuracy', value: accuracy, hint: 'today' },
+          { label: 'Due', value: String(dueCount), hint: 'for review' },
+          { label: 'New', value: String(today.newItems), hint: 'words today' },
+        ]}
+      />
 
       {suggested && profile ? (
         <Card tone="accent">
@@ -81,34 +112,27 @@ export default function Dashboard() {
         </Card>
       ) : null}
 
-      <Card onPress={() => router.push('/alarms')} accessibilityLabel="Alarms">
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.md }}>
-          <Ionicons name="alarm-outline" size={24} color={colors.textMuted} />
-          <View style={{ flex: 1 }}>
-            <Text variant="label" tone="subtle">
-              Next alarm
-            </Text>
-            {nextAlarm ? (
-              <>
-                <Text variant="bodyStrong">
-                  {formatAlarmTime(nextAlarm.alarm.hour, nextAlarm.alarm.minute)} · {describeTimeUntil(nextAlarm.at, now)}
-                </Text>
-                <Text variant="caption" tone="muted">
-                  {describeRepeat(nextAlarm.alarm.days)} · {nextAlarm.alarm.questionCount} questions to dismiss
-                </Text>
-              </>
-            ) : (
-              <>
-                <Text variant="bodyStrong">No alarm set</Text>
-                <Text variant="caption" tone="muted">
-                  Wake up with a few quick questions.
-                </Text>
-              </>
-            )}
-          </View>
-          <Ionicons name="chevron-forward" size={18} color={colors.textSubtle} />
-        </View>
-      </Card>
+      <SectionHeader title="Daily moments" />
+      <ListGroup>
+        <ListRow
+          first
+          icon="alarm-outline"
+          title={nextAlarm ? `${formatAlarmTime(nextAlarm.alarm.hour, nextAlarm.alarm.minute)} · ${describeTimeUntil(nextAlarm.at, now)}` : 'No alarm set'}
+          subtitle={
+            nextAlarm
+              ? `${describeRepeat(nextAlarm.alarm.days)} · ${nextAlarm.alarm.questionCount} questions to dismiss`
+              : 'Wake up with a few quick questions'
+          }
+          onPress={() => router.push('/alarms')}
+        />
+        <ListRow
+          icon="phone-portrait-outline"
+          title="Unlock learning"
+          subtitle={unlock?.enabled ? `Up to ${unlock.maxCardsPerDay} cards a day` : 'Small cards when you pick up your phone'}
+          value={unlock?.enabled ? 'On' : 'Off'}
+          onPress={() => router.push('/unlock-settings')}
+        />
+      </ListGroup>
 
       <Button label="Add a word" icon="add" variant="secondary" onPress={() => router.push('/words/add')} />
     </Screen>

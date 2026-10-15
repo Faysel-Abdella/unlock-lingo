@@ -26,7 +26,8 @@ function* walk(dir) {
 let inlined = 0;
 for (const file of walk(path.join(dist, 'assets'))) {
   const ext = path.extname(file);
-  if (ext === '.ttf' && !path.basename(file).startsWith('Ionicons')) continue; // only icon set in use
+  // Only fonts the app uses: the Ionicons icon set and DM Sans.
+  if (ext === '.ttf' && !/^(Ionicons|DMSans_)/.test(path.basename(file))) continue;
   if (/@\dx\.png$/.test(file) || !MIME[ext]) continue;
   const url = '/' + path.relative(dist, file).split(path.sep).join('/');
   if (!js.includes(url)) continue;

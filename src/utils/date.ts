@@ -53,3 +53,16 @@ export function formatRelativeDue(dueAt: number, now: number): string {
   const months = Math.round(days / 30);
   return `in ${months} mo`;
 }
+
+/** Measures how long a question has been on screen. Start it when the question appears. */
+export function createStopwatch() {
+  let startedAt = Date.now();
+  return {
+    restart() {
+      startedAt = Date.now();
+    },
+    elapsedMs() {
+      return Date.now() - startedAt;
+    },
+  };
+}

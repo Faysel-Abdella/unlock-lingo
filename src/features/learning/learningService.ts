@@ -73,6 +73,8 @@ export interface PreparedSession {
   /** Distractor sources for exercise generation. */
   pool: LearningItem[];
   lastExerciseTypes: Record<string, string>;
+  /** Items already in My Words, so the card can show them as saved. */
+  personalItemIds: string[];
 }
 
 /**
@@ -127,6 +129,7 @@ export async function prepareSession(
     items,
     pool,
     lastExerciseTypes: Object.fromEntries(lastTypes),
+    personalItemIds: candidates.filter((c) => c.personal !== null).map((c) => c.itemId),
   };
 }
 

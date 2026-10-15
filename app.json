@@ -17,7 +17,11 @@
         "monochromeImage": "./assets/android-icon-monochrome.png"
       },
       "predictiveBackGestureEnabled": false,
-      "permissions": []
+      "blockedPermissions": [
+        "android.permission.SYSTEM_ALERT_WINDOW",
+        "android.permission.READ_EXTERNAL_STORAGE",
+        "android.permission.WRITE_EXTERNAL_STORAGE"
+      ]
     },
     "ios": {
       "supportsTablet": false,
@@ -32,7 +36,9 @@
           "image": "./assets/splash-icon.png",
           "imageWidth": 160,
           "backgroundColor": "#F7F6F2",
-          "dark": { "backgroundColor": "#121413" }
+          "dark": {
+            "backgroundColor": "#121413"
+          }
         }
       ]
     ]

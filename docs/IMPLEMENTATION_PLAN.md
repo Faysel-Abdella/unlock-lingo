@@ -53,8 +53,9 @@ Guiding rules:
 | Unlock events | **No** | Opt-in `UnlockListenerService` (FGS) registering a runtime receiver for `ACTION_USER_PRESENT` |
 | Permission state queries | **No** | Module methods: `canScheduleExactAlarms`, `canUseFullScreenIntent`, `isIgnoringBatteryOptimizations`, plus openers for each settings screen |
 
-The native code will live in `modules/unlock-lingo-native` as a local Expo Module (Kotlin plus a
-TS interface). A config plugin adds the manifest entries, so `/android` stays generated (CNG).
+The native code lives in `modules/alarm-clock` as a local Expo module (Kotlin). Its own
+`AndroidManifest.xml` declares the receivers, service and permissions, and the manifest merger
+adds them to the generated app, so no config plugin is needed and `/android` stays generated.
 JS reaches it only through `src/native/`, which exports typed wrappers and no-op fallbacks for
 non-Android platforms and tests.
 

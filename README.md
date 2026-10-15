@@ -5,7 +5,7 @@
 Unlock Lingo is an Android-first app for learning a language without scheduling study time.
 It attaches tiny learning moments to two habits you already have:
 
-1. **Waking up.** Turning off the alarm takes a short micro-challenge (Phase 2).
+1. **Waking up.** Turning off the alarm takes a short micro-challenge.
 2. **Unlocking your phone.** A small, rate-limited learning card appears now and then (Phase 3).
 
 Most moments take under 15 seconds. A local spaced-repetition engine (FSRS-5) decides what you
@@ -16,7 +16,7 @@ see, so reviews of older material always come before new words. Everything works
 | Phase | Scope | State |
 | ----- | ----- | ----- |
 | 1 | Project setup, navigation, SQLite and migrations, content schema and seed data, FSRS engine, vocabulary cards, My Words, progress tracking, dashboard, onboarding, settings | ✅ Done |
-| 2 | Alarm creation, `AlarmManager` integration, full-screen alarm, learning challenge, reliable dismissal | Planned |
+| 2 | Alarm creation, `AlarmManager` integration, full-screen alarm, learning challenge, reliable dismissal | ✅ Built; needs device testing (see [Alarm test checklist](#alarm-test-checklist)) |
 | 3 | Unlock detection, interruption policy (cap, cooldown, quiet/work hours), notification fallback | Planned |
 | 4 | Weekly review, analytics snapshots, richer adaptive difficulty, audio improvements | Planned |
 | 5 | Optional AI personalisation | Planned |
@@ -27,9 +27,9 @@ The full plan, Android risk analysis and schema rationale are in
 ## Tech stack
 
 Expo SDK 57 (development build, **not** Expo Go) · React Native 0.86 · TypeScript (strict) ·
-Expo Router · expo-sqlite · TanStack Query · Zod · expo-speech · Jest. Zustand is in the stack
-plan for lightweight client state, but Phase 1 doesn't need it yet. Native Kotlin modules arrive
-in Phase 2.
+Expo Router · expo-sqlite · TanStack Query · Zod · expo-speech · Jest · a local Expo module in
+Kotlin (`modules/alarm-clock`). Zustand is in the stack plan for lightweight client state, but
+nothing needs it yet.
 
 ## Getting started
 
@@ -56,6 +56,10 @@ npm test               # jest: domain logic plus repositories on real SQLite
 npm run check          # all three
 ```
 
+The alarm module's pure scheduling logic (`AlarmSpec.kt`) has JVM unit tests mirroring the
+TypeScript ones. Run them from a generated project with
+`cd android && ./gradlew :alarm-clock:testDebugUnitTest`.
+
 Repository and migration tests run against Node's built-in `node:sqlite`, through the same
 `Database` interface that `expo-sqlite` satisfies. That means SQL is exercised in CI without a
 device.
@@ -70,20 +74,27 @@ src/
     session.tsx           Today's learning session (full-screen)
     vocabulary/           browser + item detail
     words/                add word + personal word detail
+    alarms/               alarm list + editor
+    alarm/ring.tsx        ringing challenge (deep link unlocklingo://alarm/ring?alarmId=…)
   components/             design-system primitives (Text, Card, Button, Chip, …)
   theme/                  tokens (colors, spacing, radius, typography, shadows) + ThemeProvider
   features/
     learning/domain/      PURE TS: FSRS, review/status, queue, exercises, session, stats, level policy
     learning/             learningService (orchestration), hooks, session hook, cards
+    alarms/domain/        PURE TS: next occurrence (DST-safe), snooze policy, challenge state machine
+    alarms/               alarmService (sync, native event import, challenge content), hooks, screens' logic
     vocabulary/ settings/ onboarding/ progress/   feature hooks and components
   repositories/           SQL lives here only. One repository per aggregate, plus row mappers
   services/
     database/             Database interface, migrations, versioned seed content, test adapter
     audio/                PronunciationService (TTS now; recorded audio or ASR later)
     ai/                   AIContentProvider interface + offline default
+  native/                 typed bridges to native modules, with no-op fallbacks
   hooks/                  repositories context, query keys, pronunciation, date
   types/                  shared domain types (languages, CEFR, learning items)
   utils/                  dates, seeded RNG
+modules/
+  alarm-clock/            local Expo module (Android, Kotlin): scheduler, receivers, ringing service
 ```
 
 Dependency direction: `app → features (hooks) → learningService → repositories → Database`,
@@ -140,7 +151,7 @@ a new one.
 | `personal_vocabulary` | My Words: links to a learning item, plus context note, source and important/difficult/mastered flags, and enrichment status |
 | `daily_activity` | Per-day counters: interactions, correct, incorrect, new, reviews, grammar, unlock cards, alarm challenges |
 | `weekly_stats` | Weekly snapshots (Phase 4) |
-| `alarms` / `alarm_history` | Alarm definitions and firing outcomes (Phase 2) |
+| `alarms` / `alarm_history` | Alarm definitions, and every ring: fired time, snoozes, how it was dismissed (`challenge`, `emergency`, `timeout`), questions answered/correct |
 
 **Seed content.** 100 vocabulary items, 30 grammar questions and 20 phrases, across B1, B2 and
 C1. It is bundled as TypeScript, validated with Zod (including "the example contains the
@@ -153,45 +164,91 @@ optionally through an `AIContentProvider` later. Until then it is reviewed as a 
 
 ## Android permissions
 
-| Permission | Phase | Why |
-| ---------- | ----- | --- |
-| `INTERNET` | 1 | Development client only (connecting to Metro). The app itself works offline. |
-| `VIBRATE` | 1 | Haptic feedback on answers |
-| `POST_NOTIFICATIONS` | 2/3 | Alarm notification and unlock-card notifications (runtime prompt on Android 13+, asked in context) |
-| `SCHEDULE_EXACT_ALARM` or `USE_EXACT_ALARM` | 2 | Alarms must fire at the exact minute |
-| `USE_FULL_SCREEN_INTENT` | 2 | Show the alarm challenge over the lock screen |
-| `RECEIVE_BOOT_COMPLETED` | 2 | Re-schedule alarms after a reboot |
-| `FOREGROUND_SERVICE` (+ type) | 2/3 | Keep the alarm ringing until dismissed; optional unlock listener |
-| `WAKE_LOCK` | 2 | Keep the CPU awake while the alarm rings |
+| Permission | Declared by | Why |
+| ---------- | ----------- | --- |
+| `INTERNET` | Expo | Development client only (connecting to Metro). The app itself works offline. |
+| `VIBRATE` | expo-haptics, alarm module | Haptic feedback; alarm vibration |
+| `POST_NOTIFICATIONS` | alarm module | The ringing alarm is a notification. Requested at runtime (Android 13+) when an alarm is saved. |
+| `SCHEDULE_EXACT_ALARM` | alarm module | Ring at the exact minute. Android 14+ denies it by default for new installs, so the app shows a shortcut to grant it. |
+| `USE_FULL_SCREEN_INTENT` | alarm module | Show the challenge over the lock screen. Users can revoke it on Android 14+; the app shows a shortcut. |
+| `RECEIVE_BOOT_COMPLETED` | alarm module | Re-schedule alarms after a reboot |
+| `FOREGROUND_SERVICE`, `FOREGROUND_SERVICE_MEDIA_PLAYBACK` | alarm module | Keep the alarm sound playing until it is dismissed |
+| `WAKE_LOCK` | alarm module | Keep the CPU awake while the alarm rings |
 
 `SYSTEM_ALERT_WINDOW` and external storage permissions are explicitly blocked in `app.json`.
-Every runtime permission will be requested in context, with a one-sentence explanation of why.
+The alarm screens list any missing permission with a one-sentence reason and a button to the
+right system setting. Battery-optimisation exemption is offered as optional.
 
-## Alarm architecture (Phase 2 design)
+## Alarm architecture
 
 Reliability matters more than visual polish. `expo-notifications` can't loop an alarm sound or
-schedule `setAlarmClock` alarms, so the alarm uses a local Expo module
-(`modules/unlock-lingo-native`, Kotlin):
+schedule `setAlarmClock` alarms, so alarms use a local Expo module, `modules/alarm-clock`
+(Kotlin, autolinked). Its `AndroidManifest.xml` merges into the generated app, so `/android`
+stays generated.
 
-1. **Schedule.** SQLite is the source of truth. On every change, JS calls
-   `scheduleAlarm(nextOccurrence)`. Native code uses `AlarmManager.setAlarmClock()` (exact,
-   Doze-exempt, shown in the status bar). It also keeps a copy of the schedule in
-   device-protected storage.
-2. **Survive.** Receivers for `BOOT_COMPLETED`, `LOCKED_BOOT_COMPLETED`, `MY_PACKAGE_REPLACED`,
-   `TIME_SET` and `TIMEZONE_CHANGED` reschedule from that copy, without JS.
-3. **Ring.** The alarm receiver starts a short-lived foreground service. It plays a looping
-   alarm-stream sound, vibrates and holds a wake lock. It posts a high-priority notification
-   with a full-screen intent to an activity that shows over the lock screen and opens the
-   challenge route.
-4. **Challenge.** N questions (default 5) are drawn by the same engine: due and difficult items,
-   with types the user chose. Answers are recorded with `context = 'alarm'`.
+1. **Schedule.** SQLite is the source of truth. After every change, and on launch and
+   foreground, `syncAlarms` sends all alarms to `AlarmClock.setAlarms`. Native code:
+   - stores a copy in **device-protected storage**, readable before the first unlock after a
+     reboot;
+   - schedules each alarm with `AlarmManager.setAlarmClock()` (exact, Doze-exempt, shown in the
+     status bar).
+
+   If exact-alarm access is denied it falls back to `setAndAllowWhileIdle` (inexact) and the app
+   warns the user.
+2. **Survive.** `RescheduleReceiver` handles boot (including locked boot), app update, time and
+   timezone changes, and exact-alarm permission changes. It rebuilds the schedule from the stored
+   copy without JS. When an alarm fires, the receiver schedules the next occurrence natively
+   (`AlarmSchedule.nextOccurrence` mirrors the TS function and has its own unit tests). A
+   one-time alarm disables itself.
+3. **Ring.** `AlarmRingingService` is a foreground service of type `mediaPlayback`:
+   - plays the default alarm sound on the alarm stream (looping), vibrates and holds a wake lock;
+   - posts a high-priority notification whose full-screen intent opens
+     `unlocklingo://alarm/ring?alarmId=…`.
+
+   While ringing, a lifecycle listener sets `showWhenLocked`/`turnScreenOn` on the app's
+   activity, and clears them as soon as ringing stops.
+4. **Challenge.** `prepareAlarmChallenge` draws due and difficult items first, then tops up from
+   the learner's level, using only the alarm's question types. The alarm stops after N
+   **correct** answers (default 5); a mistake just brings another question. Answers feed the
+   learning engine with `context = 'alarm'`.
 5. **Never trapped.**
-   - An emergency dismiss (long-press and confirm) is always available, both in JS and as a
-     notification action handled natively.
-   - The service stops itself after a maximum ring time.
-   - If content can't be generated, the alarm falls back to a plain stop button.
+   - The ring screen always shows a *press-and-hold (3 s)* emergency stop.
+   - The notification adds an **Emergency stop** action after 2 minutes, handled natively, so it
+     works even if the JS UI fails to load.
+   - The service stops itself after **10 minutes**.
+   - If no questions can be generated, the challenge resolves to a plain stop.
+   - A stale "ringing" record left by a killed process expires, so it can never block later
+     alarms.
+6. **History.** The native side logs `fired`, `snoozed`, `stopped` (`challenge`, `emergency` or
+   `timeout`) and `disabled` events. JS imports them into `alarm_history`; a snoozed alarm that
+   rings again continues the same entry.
 
-   Every dismissal is logged in `alarm_history`.
+**Choices to revisit before release**
+
+- **Foreground service type.** `mediaPlayback` fits "keep playing the alarm sound".
+  `systemExempted` is documented for apps holding an exact-alarm permission. Check against
+  current Play policy.
+- **Exact-alarm permission.** `USE_EXACT_ALARM` is granted automatically but is reserved by Play
+  policy for apps whose core function is an alarm clock. This app declares the user-grantable
+  `SCHEDULE_EXACT_ALARM` instead.
+
+### Alarm test checklist
+
+The Kotlin scheduling logic is unit-tested, and the Android code compiles against the Android 14
+framework classes. Ringing behaviour still has to be checked on a real device (Android 12, 13 and
+14+, ideally including a Samsung or Xiaomi phone):
+
+- [ ] Alarm rings on time with the app closed and swiped from recents
+- [ ] Rings with the screen off and locked: challenge appears over the lock screen
+- [ ] While using another app: heads-up notification, and tapping it opens the challenge
+- [ ] Completing N correct answers stops the sound; the lock screen returns
+- [ ] Press-and-hold emergency stop works; the notification's Emergency stop appears after 2 min
+- [ ] Ringing stops by itself after 10 minutes
+- [ ] Snooze rings again after the set minutes and respects the snooze limit
+- [ ] Alarms survive reboot (also before the first unlock), app update, and time zone change
+- [ ] A one-time alarm turns itself off after ringing, and the app shows it as off
+- [ ] With exact alarms denied, the app warns the user and the alarm still fires (possibly late)
+- [ ] `alarm_history` shows the right dismissal method for each case
 
 ## Unlock cards: Android limitations
 
@@ -210,10 +267,8 @@ schedule `setAlarmClock` alarms, so the alarm uses a local Expo module
 
 ## Roadmap
 
-- **Phase 2 (alarms):** alarm list and editor (time, repeat days, question count, challenge
-  types, snooze), native scheduling module and config plugin, permission onboarding, ringing
-  service, challenge screen, emergency dismiss, alarm history. Tests for challenge completion
-  and next-occurrence calculation.
+- **Phase 2 follow-ups:** device testing (checklist above), custom alarm sounds, a gradual
+  volume ramp, and a wheel-style time picker.
 - **Phase 3 (unlock cards):** a pure interruption policy (cap, cooldown, quiet/work hours) with
   tests, the unlock listener service, notification cards, importing native-side answers into
   SQLite.

@@ -11,7 +11,6 @@ import android.content.pm.ServiceInfo
 import android.graphics.drawable.Icon
 import android.media.AudioAttributes
 import android.media.MediaPlayer
-import android.media.RingtoneManager
 import android.net.Uri
 import android.os.Build
 import android.os.Handler
@@ -21,7 +20,6 @@ import android.os.PowerManager
 import android.os.VibrationEffect
 import android.os.Vibrator
 import android.os.VibratorManager
-import android.util.Log
 
 /**
  * Keeps the alarm ringing until the learning challenge is completed, the user
@@ -62,7 +60,7 @@ class AlarmRingingService : Service() {
     store.appendEvent("fired", alarmId, now, mapOf("snoozeCount" to snoozeCount))
 
     acquireWakeLock()
-    startSound()
+    startSound(spec)
     if (spec?.vibrate != false) startVibration()
     // If the app is open, JS navigates to the challenge itself. Otherwise the
     // full-screen intent (locked/screen off) or heads-up notification (in use) does.
@@ -147,32 +145,31 @@ class AlarmRingingService : Service() {
     }
   }
 
-  private fun alarmSoundUri(): Uri? =
-    RingtoneManager.getActualDefaultRingtoneUri(this, RingtoneManager.TYPE_ALARM)
-      ?: RingtoneManager.getDefaultUri(RingtoneManager.TYPE_ALARM)
-      ?: RingtoneManager.getDefaultUri(RingtoneManager.TYPE_RINGTONE)
-
-  private fun startSound() {
-    val uri = alarmSoundUri() ?: return
-    try {
-      player = MediaPlayer().apply {
-        setAudioAttributes(
-          AudioAttributes.Builder()
-            .setUsage(AudioAttributes.USAGE_ALARM)
-            .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
-            .build(),
-        )
-        setDataSource(this@AlarmRingingService, uri)
-        isLooping = true
-        prepare()
-        start()
-      }
-    } catch (error: Exception) {
-      // Vibration and the notification still alert the user.
-      Log.w(TAG, "Could not play alarm sound", error)
-      player?.release()
-      player = null
+  /**
+   * Plays the alarm's chosen sound, falling back to the system default if it is
+   * missing or unplayable (e.g. a removed ringtone), then ramps the volume.
+   */
+  private fun startSound(spec: AlarmSpec?) {
+    val chosen = spec?.soundUri?.let { runCatching { Uri.parse(it) }.getOrNull() }
+    val candidates = listOfNotNull(chosen, AlarmSounds.defaultUri(this)).distinct()
+    for (uri in candidates) {
+      player = AlarmSounds.createPlayer(this, uri, looping = true)
+      if (player != null) break
     }
+    val active = player ?: return // vibration and the notification still alert the user
+    val gradual = spec?.gradualVolume ?: true
+    val startedAt = System.currentTimeMillis()
+    val volume = AlarmVolume.at(0, gradual)
+    active.setVolume(volume, volume)
+    active.start()
+    if (gradual) handler.post(object : Runnable {
+      override fun run() {
+        val p = player ?: return
+        val v = AlarmVolume.at(System.currentTimeMillis() - startedAt, gradual = true)
+        p.runCatching { setVolume(v, v) }
+        if (v < 1f) handler.postDelayed(this, AlarmVolume.STEP_MS)
+      }
+    })
   }
 
   private fun startVibration() {
@@ -252,7 +249,6 @@ class AlarmRingingService : Service() {
   private fun notificationManager(): NotificationManager = getSystemService(NotificationManager::class.java)
 
   companion object {
-    private const val TAG = "AlarmRingingService"
     const val ACTION_START = "com.unlocklingo.alarmclock.START"
     const val ACTION_STOP = "com.unlocklingo.alarmclock.STOP"
     const val ACTION_SNOOZE = "com.unlocklingo.alarmclock.SNOOZE"

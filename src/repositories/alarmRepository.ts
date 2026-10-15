@@ -21,6 +21,9 @@ interface AlarmRow {
   snooze_minutes: number;
   max_snoozes: number;
   vibrate: number;
+  sound_uri: string | null;
+  sound_title: string | null;
+  gradual_volume: number;
 }
 
 export interface AlarmHistoryEntry {
@@ -101,11 +104,13 @@ function fromRow(row: AlarmRow): Alarm {
       snoozeMinutes: row.snooze_minutes,
       maxSnoozes: row.max_snoozes,
       vibrate: toBool(row.vibrate),
+      sound: row.sound_uri ? { uri: row.sound_uri, title: row.sound_title ?? 'Alarm sound' } : null,
+      gradualVolume: toBool(row.gradual_volume),
     }),
   };
 }
 
-function values(a: AlarmInput): (string | number)[] {
+function values(a: AlarmInput): (string | number | null)[] {
   return [
     a.label,
     a.hour,
@@ -118,6 +123,9 @@ function values(a: AlarmInput): (string | number)[] {
     a.snoozeMinutes,
     a.maxSnoozes,
     fromBool(a.vibrate),
+    a.sound?.uri ?? null,
+    a.sound?.title ?? null,
+    fromBool(a.gradualVolume),
   ];
 }
 
@@ -146,8 +154,9 @@ export function createAlarmRepository(db: Database): AlarmRepository {
       const id = createId('alarm-');
       await db.runAsync(
         `INSERT INTO alarms (id, label, hour, minute, days_mask, enabled, question_count, challenge_types,
-           snooze_enabled, snooze_minutes, max_snoozes, vibrate, created_at, updated_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+           snooze_enabled, snooze_minutes, max_snoozes, vibrate, sound_uri, sound_title, gradual_volume,
+           created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         [id, ...values(alarm), now, now],
       );
       return mustGet(id);
@@ -157,7 +166,8 @@ export function createAlarmRepository(db: Database): AlarmRepository {
       const alarm = alarmInputSchema.parse(input);
       await db.runAsync(
         `UPDATE alarms SET label = ?, hour = ?, minute = ?, days_mask = ?, enabled = ?, question_count = ?,
-           challenge_types = ?, snooze_enabled = ?, snooze_minutes = ?, max_snoozes = ?, vibrate = ?, updated_at = ?
+           challenge_types = ?, snooze_enabled = ?, snooze_minutes = ?, max_snoozes = ?, vibrate = ?,
+           sound_uri = ?, sound_title = ?, gradual_volume = ?, updated_at = ?
          WHERE id = ?`,
         [...values(alarm), now, id],
       );

@@ -30,6 +30,8 @@ export function toNativeSpec(alarm: Alarm): NativeAlarmSpec {
     snoozeEnabled: alarm.snoozeEnabled,
     snoozeMinutes: alarm.snoozeMinutes,
     maxSnoozes: alarm.maxSnoozes,
+    soundUri: alarm.sound?.uri ?? null,
+    gradualVolume: alarm.gradualVolume,
   };
 }
 

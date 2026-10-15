@@ -47,6 +47,22 @@ from scratch, run `npx expo prebuild --platform android --clean`.
 
 For a cloud build use EAS: `npx eas-cli@latest build --profile development --platform android`.
 
+### Android APK
+
+`.github/workflows/android-apk.yml` builds an installable release APK on GitHub Actions. Its
+runners already have the Android SDK and NDK. Open **Actions → Android APK → Run workflow**,
+or push a `v*` tag. When it finishes, download the `unlock-lingo-apk` artifact from the run
+page, unzip it and install the `.apk` on your phone (allow installs from unknown sources).
+
+- It runs `npm run check`, `expo prebuild` and `./gradlew assembleRelease`.
+- By default it builds only `arm64-v8a`, which covers almost every current phone. Other ABIs can
+  be entered when starting the run.
+- The APK is signed with the generated project's debug key. That's fine for your own devices,
+  but the Play Store needs a release keystore (or EAS Build).
+
+To build locally instead: `npx expo prebuild --platform android`, then
+`cd android && ./gradlew assembleRelease`. This needs the Android SDK, NDK and JDK 17.
+
 ### Web preview
 
 The UI also runs in a browser (React Native for Web). Use it for design reviews, not for

@@ -13,4 +13,7 @@ export const queryKeys = {
   item: (id: string) => ['learning', 'item', id] as const,
   personalWords: ['learning', 'personal'] as const,
   personalWord: (id: string) => ['learning', 'personal', id] as const,
+  alarms: ['alarms'] as const,
+  alarm: (id: string) => ['alarms', id] as const,
+  alarmPermissions: ['alarmPermissions'] as const,
 };

@@ -1,8 +1,11 @@
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
+import { useState } from 'react';
 import { View } from 'react-native';
 
 import { Button, Card, ProgressBar, Screen, StatTile, Text } from '@/components';
+import { describeRepeat, describeTimeUntil, formatAlarmTime } from '@/features/alarms/domain/schedule';
+import { useNextAlarm } from '@/features/alarms/hooks';
 import { useDashboard } from '@/features/learning/hooks';
 import { useProfile, useSaveProfile } from '@/features/settings/hooks';
 import { useTheme } from '@/theme/ThemeProvider';
@@ -18,22 +21,24 @@ export default function Dashboard() {
   const { data } = useDashboard();
   const profile = useProfile().data;
   const saveProfile = useSaveProfile();
+  const [now] = useState(Date.now);
+  const nextAlarm = useNextAlarm(now);
 
   if (!data) return <Screen>{null}</Screen>;
 
   const { today, dailyGoal, dueCount, streak, levelPolicy } = data;
   const answered = today.correct + today.incorrect;
   const accuracy = answered === 0 ? '–' : `${Math.round((today.correct / answered) * 100)}%`;
-  const now = new Date();
+  const date = new Date(now);
   const suggested = levelPolicy.suggestedLevel;
 
   return (
     <Screen>
       <View style={{ gap: spacing.xs }}>
         <Text variant="caption" tone="muted">
-          {now.toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric' })}
+          {date.toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric' })}
         </Text>
-        <Text variant="title">{greeting(now.getHours())}</Text>
+        <Text variant="title">{greeting(date.getHours())}</Text>
       </View>
 
       <Card>
@@ -76,18 +81,32 @@ export default function Dashboard() {
         </Card>
       ) : null}
 
-      <Card>
+      <Card onPress={() => router.push('/alarms')} accessibilityLabel="Alarms">
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.md }}>
           <Ionicons name="alarm-outline" size={24} color={colors.textMuted} />
           <View style={{ flex: 1 }}>
             <Text variant="label" tone="subtle">
               Next alarm
             </Text>
-            <Text variant="bodyStrong">No alarm set</Text>
-            <Text variant="caption" tone="muted">
-              Learn-to-dismiss alarms are coming in the next update.
-            </Text>
+            {nextAlarm ? (
+              <>
+                <Text variant="bodyStrong">
+                  {formatAlarmTime(nextAlarm.alarm.hour, nextAlarm.alarm.minute)} · {describeTimeUntil(nextAlarm.at, now)}
+                </Text>
+                <Text variant="caption" tone="muted">
+                  {describeRepeat(nextAlarm.alarm.days)} · {nextAlarm.alarm.questionCount} questions to dismiss
+                </Text>
+              </>
+            ) : (
+              <>
+                <Text variant="bodyStrong">No alarm set</Text>
+                <Text variant="caption" tone="muted">
+                  Wake up with a few quick questions.
+                </Text>
+              </>
+            )}
           </View>
+          <Ionicons name="chevron-forward" size={18} color={colors.textSubtle} />
         </View>
       </Card>
 

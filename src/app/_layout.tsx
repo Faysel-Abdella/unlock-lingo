@@ -6,6 +6,7 @@ import { StatusBar } from 'expo-status-bar';
 import { Suspense, useEffect } from 'react';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
+import { AlarmRuntime } from '@/features/alarms/AlarmRuntime';
 import { useProfile, useSettings } from '@/features/settings/hooks';
 import { RepositoriesProvider } from '@/hooks/useRepositories';
 import { DATABASE_NAME, initializeDatabase } from '@/services/database/initialize';
@@ -60,6 +61,7 @@ function Navigator() {
   return (
     <>
       <StatusBar style={scheme === 'dark' ? 'light' : 'dark'} />
+      <AlarmRuntime />
       <Stack
         screenOptions={{
           headerShadowVisible: false,
@@ -77,6 +79,9 @@ function Navigator() {
         <Stack.Screen name="vocabulary/[id]" options={{ title: '' }} />
         <Stack.Screen name="words/add" options={{ title: 'Add a word', presentation: 'modal' }} />
         <Stack.Screen name="words/[id]" options={{ title: '' }} />
+        <Stack.Screen name="alarms/index" options={{ title: 'Alarms' }} />
+        <Stack.Screen name="alarms/[id]" options={{ title: 'Alarm' }} />
+        <Stack.Screen name="alarm/ring" options={{ headerShown: false, gestureEnabled: false, animation: 'fade' }} />
       </Stack>
     </>
   );

@@ -1,4 +1,5 @@
 import Constants from 'expo-constants';
+import { router } from 'expo-router';
 import { Alert, View } from 'react-native';
 
 import { Button, Card, Chip, Screen, SectionHeader, Text } from '@/components';
@@ -142,6 +143,12 @@ function SettingsForm({ settings, profile }: { settings: AppSettings; profile: U
             ))}
           </Wrap>
         </SettingRow>
+      </Card>
+
+      <SectionHeader title="Alarms" />
+      <Card onPress={() => router.push('/alarms')} accessibilityLabel="Manage alarms">
+        <Text variant="bodyStrong">Learn-to-dismiss alarms</Text>
+        <Text tone="muted">Create alarms, choose how many questions stop them, and check alarm permissions.</Text>
       </Card>
 
       <SectionHeader title="Audio" />

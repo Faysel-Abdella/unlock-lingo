@@ -101,6 +101,18 @@ describe('applyReview', () => {
     expect(p!.confidence).toBeLessThan(1);
   });
 
+  it('does not count "new to me" on a first exposure as a mistake', () => {
+    const result = applyReview(null, {
+      itemId: 'a',
+      exerciseType: 'intro',
+      outcome: { kind: 'self', knewIt: false },
+      context: 'session',
+      now: T0,
+    });
+    expect(result.scored).toBe(false);
+    expect(result.progress).toMatchObject({ incorrectCount: 0, correctCount: 0, seenCount: 1, fsrsState: 'learning' });
+  });
+
   it('schedules a failed item sooner than a successful one', () => {
     const base = progress({ lastReviewedAt: T0, dueAt: T0 + 10 * DAY_MS });
     const now = T0 + 10 * DAY_MS;

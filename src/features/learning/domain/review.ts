@@ -123,6 +123,11 @@ export interface ReviewResult {
   record: ReviewRecord;
   /** True when this was the learner's first ever answer for the item. */
   wasNew: boolean;
+  /**
+   * False for a first-exposure self-grade ("new to me" on an intro card): not
+   * knowing an unseen word is not a mistake, so it does not affect accuracy.
+   */
+  scored: boolean;
 }
 
 /** Applies one answer to an item's progress. Pure: persistence happens in the repository. */
@@ -134,6 +139,8 @@ export function applyReview(
   const before = previous ?? emptyProgress(input.itemId);
   const rating = ratingForAnswer(input.outcome);
   const correct = isCorrect(input.outcome);
+  const wasNew = before.reps === 0;
+  const scored = !(wasNew && input.outcome.kind === 'self');
   const { card } = schedule(toFsrsCard(before), rating, input.now, params);
 
   const updated: LearningProgress = {
@@ -146,17 +153,20 @@ export function applyReview(
     reps: card.reps,
     lapses: card.lapses,
     seenCount: before.seenCount + 1,
-    correctCount: before.correctCount + (correct ? 1 : 0),
-    incorrectCount: before.incorrectCount + (correct ? 0 : 1),
-    streak: correct ? before.streak + 1 : 0,
-    confidence: before.confidence + CONFIDENCE_ALPHA * ((correct ? 1 : 0) - before.confidence),
+    correctCount: before.correctCount + (scored && correct ? 1 : 0),
+    incorrectCount: before.incorrectCount + (scored && !correct ? 1 : 0),
+    streak: !scored ? before.streak : correct ? before.streak + 1 : 0,
+    confidence: scored
+      ? before.confidence + CONFIDENCE_ALPHA * ((correct ? 1 : 0) - before.confidence)
+      : before.confidence,
     lastRating: rating,
   };
   updated.status = deriveStatus(updated);
 
   return {
     progress: updated,
-    wasNew: before.reps === 0,
+    wasNew,
+    scored,
     record: {
       itemId: input.itemId,
       exerciseType: input.exerciseType,

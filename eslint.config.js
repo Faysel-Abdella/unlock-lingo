@@ -8,6 +8,7 @@ module.exports = defineConfig([
     ignores: ['dist/*', 'android/*', 'ios/*', '.expo/*'],
   },
   {
+    files: ['**/*.ts', '**/*.tsx'],
     rules: {
       '@typescript-eslint/no-explicit-any': 'error',
     },

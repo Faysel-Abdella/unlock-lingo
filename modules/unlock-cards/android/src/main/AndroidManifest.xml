@@ -1,0 +1,39 @@
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+  <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+  <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+  <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+  <!-- No standard type fits "react to unlocks"; specialUse requires a declared reason (below)
+       and a Play Console justification. The listener is strictly opt-in. -->
+  <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
+
+  <application>
+    <service
+      android:name="com.unlocklingo.unlockcards.UnlockListenerService"
+      android:exported="false"
+      android:foregroundServiceType="specialUse">
+      <property
+        android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
+        android:value="Opt-in: shows a short language-learning card after the user unlocks the device, limited by user-set daily caps, cooldowns and quiet hours." />
+    </service>
+
+    <receiver
+      android:name="com.unlocklingo.unlockcards.CardActionReceiver"
+      android:exported="false" />
+
+    <receiver
+      android:name="com.unlocklingo.unlockcards.ScheduledCardReceiver"
+      android:exported="false" />
+
+    <!-- Protected system broadcasts: only the system can send these. -->
+    <receiver
+      android:name="com.unlocklingo.unlockcards.CardBootReceiver"
+      android:exported="true">
+      <intent-filter>
+        <action android:name="android.intent.action.BOOT_COMPLETED" />
+        <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
+        <action android:name="android.intent.action.TIME_SET" />
+        <action android:name="android.intent.action.TIMEZONE_CHANGED" />
+      </intent-filter>
+    </receiver>
+  </application>
+</manifest>

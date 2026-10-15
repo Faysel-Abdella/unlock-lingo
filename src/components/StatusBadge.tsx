@@ -1,6 +1,7 @@
-import type { LearningStatus } from '@/types/learning';
-import { useTheme } from '@/theme/ThemeProvider';
 import { View } from 'react-native';
+
+import { useTheme } from '@/theme/ThemeProvider';
+import type { LearningStatus } from '@/types/learning';
 
 import { Text } from './Text';
 
@@ -12,18 +13,31 @@ export const STATUS_LABEL: Record<LearningStatus, string> = {
   difficult: 'Difficult',
 };
 
+/** Dot + label: the text carries the meaning, colour only reinforces it. */
 export function StatusBadge({ status }: { status: LearningStatus }) {
   const { colors, radius, spacing } = useTheme();
   const tone = {
-    new: { bg: colors.surfaceMuted, fg: colors.textMuted },
-    learning: { bg: colors.warningSoft, fg: colors.warning },
-    reviewing: { bg: colors.accentSoft, fg: colors.accent },
-    mastered: { bg: colors.successSoft, fg: colors.success },
-    difficult: { bg: colors.dangerSoft, fg: colors.danger },
+    new: colors.textSubtle,
+    learning: colors.warning,
+    reviewing: colors.accent,
+    mastered: colors.success,
+    difficult: colors.danger,
   }[status];
   return (
-    <View style={{ backgroundColor: tone.bg, borderRadius: radius.pill, paddingHorizontal: spacing.sm, paddingVertical: 2 }}>
-      <Text variant="caption" style={{ color: tone.fg, fontWeight: '600' }}>
+    <View
+      style={{
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: spacing.xs,
+        borderRadius: radius.pill,
+        borderWidth: 1,
+        borderColor: colors.border,
+        paddingHorizontal: spacing.sm,
+        paddingVertical: 2,
+      }}
+    >
+      <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: tone }} />
+      <Text variant="captionStrong" style={{ color: tone }}>
         {STATUS_LABEL[status]}
       </Text>
     </View>

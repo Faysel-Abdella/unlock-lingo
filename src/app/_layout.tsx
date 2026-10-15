@@ -1,16 +1,20 @@
+import { DMSans_400Regular } from '@expo-google-fonts/dm-sans/400Regular';
+import { DMSans_500Medium } from '@expo-google-fonts/dm-sans/500Medium';
+import { DMSans_600SemiBold } from '@expo-google-fonts/dm-sans/600SemiBold';
+import { DMSans_700Bold } from '@expo-google-fonts/dm-sans/700Bold';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { useFonts } from 'expo-font';
 import { Stack } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
-import { SQLiteProvider } from 'expo-sqlite';
 import { StatusBar } from 'expo-status-bar';
-import { Suspense, useEffect } from 'react';
+import { useEffect } from 'react';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 import { AlarmRuntime } from '@/features/alarms/AlarmRuntime';
 import { useProfile, useSettings } from '@/features/settings/hooks';
 import { UnlockRuntime } from '@/features/unlock/UnlockRuntime';
 import { RepositoriesProvider } from '@/hooks/useRepositories';
-import { DATABASE_NAME, initializeDatabase } from '@/services/database/initialize';
+import { DatabaseProvider } from '@/services/database/DatabaseProvider';
 import { ThemeProvider, useTheme } from '@/theme/ThemeProvider';
 
 export { ErrorBoundary } from 'expo-router';
@@ -27,15 +31,13 @@ const queryClient = new QueryClient({
 export default function RootLayout() {
   return (
     <SafeAreaProvider>
-      <Suspense fallback={null}>
-        <SQLiteProvider databaseName={DATABASE_NAME} onInit={initializeDatabase} useSuspense>
-          <QueryClientProvider client={queryClient}>
-            <RepositoriesProvider>
-              <AppShell />
-            </RepositoriesProvider>
-          </QueryClientProvider>
-        </SQLiteProvider>
-      </Suspense>
+      <DatabaseProvider>
+        <QueryClientProvider client={queryClient}>
+          <RepositoriesProvider>
+            <AppShell />
+          </RepositoriesProvider>
+        </QueryClientProvider>
+      </DatabaseProvider>
     </SafeAreaProvider>
   );
 }
@@ -43,7 +45,9 @@ export default function RootLayout() {
 function AppShell() {
   const settings = useSettings();
   const profile = useProfile();
-  const ready = !settings.isPending && !profile.isPending;
+  const [fontsLoaded, fontError] = useFonts({ DMSans_400Regular, DMSans_500Medium, DMSans_600SemiBold, DMSans_700Bold });
+  // A font failure falls back to the system font rather than blocking the app.
+  const ready = !settings.isPending && !profile.isPending && (fontsLoaded || !!fontError);
 
   useEffect(() => {
     if (ready) void SplashScreen.hideAsync();

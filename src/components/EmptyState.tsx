@@ -17,7 +17,7 @@ export function EmptyState({ icon, title, message, action }: EmptyStateProps) {
   const { colors, spacing } = useTheme();
   return (
     <View style={{ alignItems: 'center', paddingVertical: spacing.xxxl, gap: spacing.md }}>
-      <Ionicons name={icon} size={36} color={colors.textSubtle} />
+      <Ionicons name={icon} size={36} color={colors.textSubtle} accessibilityElementsHidden importantForAccessibility="no" />
       <Text variant="heading" align="center">
         {title}
       </Text>

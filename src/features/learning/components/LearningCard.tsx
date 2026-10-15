@@ -20,7 +20,7 @@ export interface LearningCardActions {
  * attention, with supporting detail below and at most two primary actions.
  */
 export function LearningCard({ item, actions }: { item: LearningItem; actions?: LearningCardActions }) {
-  const { colors, radius, spacing, shadow } = useTheme();
+  const { colors, radius, spacing } = useTheme();
 
   return (
     <View
@@ -31,13 +31,19 @@ export function LearningCard({ item, actions }: { item: LearningItem; actions?: 
         borderRadius: radius.xl,
         padding: spacing.xl,
         gap: spacing.lg,
-        ...shadow,
       }}
     >
       <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-        <Text variant="label" tone="subtle">
-          {item.type === 'vocabulary' ? 'Word' : item.type === 'phrase' ? 'Phrase' : 'Grammar'} · {item.cefrLevel}
-        </Text>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm }}>
+          <Text variant="label" tone="accent">
+            {item.type === 'vocabulary' ? 'Word' : item.type === 'phrase' ? 'Phrase' : 'Grammar'}
+          </Text>
+          <View style={{ borderWidth: 1, borderColor: colors.border, borderRadius: radius.sm, paddingHorizontal: spacing.xs + 2 }}>
+            <Text variant="captionStrong" tone="muted">
+              {item.cefrLevel}
+            </Text>
+          </View>
+        </View>
         <View style={{ flexDirection: 'row' }}>
           {actions?.onSave ? (
             <IconButton
@@ -79,8 +85,20 @@ function ListenButton({ onListen }: { onListen?: () => void }) {
   return <IconButton icon="volume-medium-outline" label="Listen" onPress={onListen} />;
 }
 
+function Example({ text }: { text: string }) {
+  const { colors, spacing } = useTheme();
+  return (
+    <View style={{ flexDirection: 'row', gap: spacing.md }}>
+      <View style={{ width: 3, borderRadius: 2, backgroundColor: colors.accent }} />
+      <Text tone="muted" style={{ flex: 1 }}>
+        {text}
+      </Text>
+    </View>
+  );
+}
+
 function VocabularyBody({ item, onListen }: { item: Extract<LearningItem, { type: 'vocabulary' }>; onListen?: () => void }) {
-  const { spacing } = useTheme();
+  const { colors, spacing } = useTheme();
   const meta = [item.pronunciation, item.partOfSpeech].filter(Boolean).join('  ·  ');
   return (
     <View style={{ gap: spacing.md }}>
@@ -97,14 +115,11 @@ function VocabularyBody({ item, onListen }: { item: Extract<LearningItem, { type
           <ListenButton onListen={onListen} />
         </View>
       </View>
+      <View style={{ height: 1, backgroundColor: colors.border }} />
       {item.definition ? <Text variant="bodyLarge">{item.definition}</Text> : (
         <Text tone="muted">No definition yet. Add one from My Words.</Text>
       )}
-      {item.example ? (
-        <Text tone="muted" style={{ fontStyle: 'italic' }}>
-          “{item.example}”
-        </Text>
-      ) : null}
+      {item.example ? <Example text={item.example} /> : null}
       {item.synonyms.length > 0 ? (
         <Text variant="caption" tone="subtle">
           Similar: {item.synonyms.join(', ')}
@@ -125,9 +140,7 @@ function PhraseBody({ item, onListen }: { item: Extract<LearningItem, { type: 'p
         <ListenButton onListen={onListen} />
       </View>
       <Text variant="bodyLarge">{item.meaning}</Text>
-      <Text tone="muted" style={{ fontStyle: 'italic' }}>
-        “{item.example}”
-      </Text>
+      <Example text={item.example} />
       {item.usageNote ? (
         <Text variant="caption" tone="subtle">
           {item.usageNote}
@@ -145,9 +158,7 @@ function GrammarBody({ item }: { item: Extract<LearningItem, { type: 'grammar' }
         {item.rule}
       </Text>
       <Text variant="bodyLarge">{item.explanation}</Text>
-      <Text tone="muted" style={{ fontStyle: 'italic' }}>
-        {item.example}
-      </Text>
+      <Example text={item.example} />
     </View>
   );
 }

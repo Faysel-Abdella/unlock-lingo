@@ -137,7 +137,7 @@ function EmergencyStop({ onStop }: { onStop: () => void }) {
         paddingHorizontal: spacing.lg,
       }}
     >
-      <Text variant="caption" tone={holding ? 'danger' : 'muted'} style={{ fontWeight: '600' }}>
+      <Text variant="captionStrong" tone={holding ? 'danger' : 'muted'}>
         {holding ? 'Keep holding…' : 'Emergency stop: press and hold'}
       </Text>
     </Pressable>

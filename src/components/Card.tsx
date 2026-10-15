@@ -11,8 +11,9 @@ interface CardProps {
   accessibilityLabel?: string;
 }
 
+/** Flat surface with a hairline outline (Swiss style: no shadows). */
 export function Card({ children, onPress, style, tone = 'surface', accessibilityLabel }: CardProps) {
-  const { colors, radius, spacing, shadow } = useTheme();
+  const { colors, radius, spacing } = useTheme();
   const background = tone === 'muted' ? colors.surfaceMuted : tone === 'accent' ? colors.accentSoft : colors.surface;
   const base: ViewStyle = {
     backgroundColor: background,
@@ -21,7 +22,7 @@ export function Card({ children, onPress, style, tone = 'surface', accessibility
     borderWidth: tone === 'surface' ? 1 : 0,
     borderColor: colors.border,
     gap: spacing.sm,
-    ...(tone === 'surface' ? shadow : {}),
+    overflow: 'hidden',
   };
   if (!onPress) return <View style={[base, style]}>{children}</View>;
   return (
@@ -29,7 +30,8 @@ export function Card({ children, onPress, style, tone = 'surface', accessibility
       onPress={onPress}
       accessibilityRole="button"
       accessibilityLabel={accessibilityLabel}
-      style={({ pressed }) => [base, { opacity: pressed ? 0.85 : 1 }, style]}
+      android_ripple={{ color: colors.ripple }}
+      style={({ pressed }) => [base, { opacity: pressed ? 0.88 : 1 }, style]}
     >
       {children}
     </Pressable>

@@ -3,7 +3,19 @@ import { useColorScheme } from 'react-native';
 
 import type { ThemePreference } from '@/features/settings/schema';
 
-import { type ColorPalette, cardShadow, darkColors, lightColors, radius, spacing, typography } from './tokens';
+import {
+  type ColorPalette,
+  cardShadow,
+  darkColors,
+  fonts,
+  iconSize,
+  lightColors,
+  motion,
+  radius,
+  spacing,
+  touchTarget,
+  typography,
+} from './tokens';
 
 export interface Theme {
   scheme: 'light' | 'dark';
@@ -11,6 +23,10 @@ export interface Theme {
   spacing: typeof spacing;
   radius: typeof radius;
   typography: typeof typography;
+  fonts: typeof fonts;
+  iconSize: typeof iconSize;
+  motion: typeof motion;
+  touchTarget: number;
   shadow: ReturnType<typeof cardShadow>;
 }
 
@@ -21,6 +37,10 @@ function buildTheme(scheme: 'light' | 'dark'): Theme {
     spacing,
     radius,
     typography,
+    fonts,
+    iconSize,
+    motion,
+    touchTarget,
     shadow: cardShadow(scheme),
   };
 }

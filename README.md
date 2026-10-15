@@ -47,6 +47,19 @@ from scratch, run `npx expo prebuild --platform android --clean`.
 
 For a cloud build use EAS: `npx eas-cli@latest build --profile development --platform android`.
 
+### Web preview
+
+The UI also runs in a browser (React Native for Web). Use it for design reviews, not for
+testing alarms or unlock cards, which are Android-only and are disabled there.
+
+```bash
+npm run web            # live dev server at http://localhost:8081
+npm run preview:web    # one self-contained web-preview.html that opens anywhere, even offline
+```
+
+On web the database is [sql.js](https://sql.js.org) (SQLite compiled to WebAssembly), kept in
+memory and saved to `localStorage`. It needs no cross-origin isolation headers.
+
 ### Quality checks
 
 ```bash

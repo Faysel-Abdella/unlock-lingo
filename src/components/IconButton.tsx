@@ -11,25 +11,26 @@ interface IconButtonProps {
   size?: number;
 }
 
-export function IconButton({ icon, onPress, label, active, size = 22 }: IconButtonProps) {
-  const { colors, radius } = useTheme();
+/** Icon-only control: 48dp target, accessible name and selected state. */
+export function IconButton({ icon, onPress, label, active, size }: IconButtonProps) {
+  const { colors, radius, touchTarget, iconSize } = useTheme();
   return (
     <Pressable
       onPress={onPress}
       accessibilityRole="button"
       accessibilityLabel={label}
       accessibilityState={{ selected: !!active }}
-      hitSlop={8}
+      android_ripple={{ color: colors.ripple, borderless: true, radius: touchTarget / 2 }}
       style={({ pressed }) => ({
-        width: 44,
-        height: 44,
+        width: touchTarget,
+        height: touchTarget,
         borderRadius: radius.pill,
         alignItems: 'center',
         justifyContent: 'center',
         backgroundColor: active ? colors.accentSoft : pressed ? colors.surfaceMuted : 'transparent',
       })}
     >
-      <Ionicons name={icon} size={size} color={active ? colors.accent : colors.textMuted} />
+      <Ionicons name={icon} size={size ?? iconSize.md} color={active ? colors.accent : colors.textMuted} />
     </Pressable>
   );
 }

@@ -30,10 +30,10 @@ export function Button({
   style,
   accessibilityHint,
 }: ButtonProps) {
-  const { colors, radius, spacing } = useTheme();
+  const { colors, radius, spacing, touchTarget, iconSize } = useTheme();
   const palette: Record<Variant, { bg: string; fg: string; border: string }> = {
     primary: { bg: colors.accent, fg: colors.onAccent, border: colors.accent },
-    secondary: { bg: colors.surface, fg: colors.text, border: colors.border },
+    secondary: { bg: colors.surface, fg: colors.text, border: colors.borderStrong },
     ghost: { bg: 'transparent', fg: colors.accent, border: 'transparent' },
     danger: { bg: colors.dangerSoft, fg: colors.danger, border: colors.dangerSoft },
   };
@@ -48,9 +48,10 @@ export function Button({
       accessibilityLabel={label}
       accessibilityHint={accessibilityHint}
       accessibilityState={{ disabled: !!inactive, busy: !!loading }}
+      android_ripple={{ color: colors.ripple }}
       style={({ pressed }) => [
         {
-          minHeight: size === 'lg' ? 56 : 44,
+          minHeight: size === 'lg' ? 56 : touchTarget,
           borderRadius: radius.md,
           backgroundColor: p.bg,
           borderWidth: 1,
@@ -58,7 +59,8 @@ export function Button({
           paddingHorizontal: spacing.lg,
           alignItems: 'center',
           justifyContent: 'center',
-          opacity: inactive ? 0.5 : pressed ? 0.85 : 1,
+          overflow: 'hidden',
+          opacity: inactive ? 0.45 : pressed ? 0.88 : 1,
         },
         style,
       ]}
@@ -67,8 +69,10 @@ export function Button({
         <ActivityIndicator color={p.fg} />
       ) : (
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm }}>
-          {icon ? <Ionicons name={icon} size={20} color={p.fg} /> : null}
-          <Text variant="bodyStrong" style={{ color: p.fg }}>
+          {icon ? (
+            <Ionicons name={icon} size={iconSize.sm} color={p.fg} accessibilityElementsHidden importantForAccessibility="no" />
+          ) : null}
+          <Text variant="button" style={{ color: p.fg }}>
             {label}
           </Text>
         </View>

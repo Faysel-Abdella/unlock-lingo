@@ -10,7 +10,7 @@ interface TextFieldProps extends TextInputProps {
 }
 
 export function TextField({ label, hint, style, ...rest }: TextFieldProps) {
-  const { colors, radius, spacing, typography } = useTheme();
+  const { colors, radius, spacing, typography, touchTarget } = useTheme();
   return (
     <View style={{ gap: spacing.xs }}>
       <Text variant="label" tone="subtle">
@@ -25,12 +25,12 @@ export function TextField({ label, hint, style, ...rest }: TextFieldProps) {
             ...typography.body,
             color: colors.text,
             backgroundColor: colors.surface,
-            borderColor: colors.border,
+            borderColor: colors.borderStrong,
             borderWidth: 1,
             borderRadius: radius.md,
             paddingHorizontal: spacing.md,
             paddingVertical: spacing.md,
-            minHeight: rest.multiline ? 88 : 48,
+            minHeight: rest.multiline ? 96 : touchTarget,
             textAlignVertical: rest.multiline ? 'top' : 'center',
           },
           style,

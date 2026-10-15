@@ -1,5 +1,6 @@
 import type { Database } from '../types';
 import { migration001 } from './001_initial';
+import { migration002 } from './002_pronunciation';
 
 export interface Migration {
   version: number;
@@ -8,7 +9,7 @@ export interface Migration {
 }
 
 /** Ordered list of schema migrations. Never edit a shipped migration: add a new one. */
-export const MIGRATIONS: readonly Migration[] = [migration001];
+export const MIGRATIONS: readonly Migration[] = [migration001, migration002];
 
 export async function getSchemaVersion(db: Database): Promise<number> {
   const row = await db.getFirstAsync<{ user_version: number }>('PRAGMA user_version', []);

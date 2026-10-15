@@ -1,4 +1,13 @@
-import { INTRO_QUIZ_GAP, RETRY_GAP, answerStep, createSession, currentStep, isComplete, summarize } from './session';
+import {
+  INTRO_QUIZ_GAP,
+  RETRY_GAP,
+  addSpeakingPractice,
+  answerStep,
+  createSession,
+  currentStep,
+  isComplete,
+  summarize,
+} from './session';
 
 const always = () => true;
 
@@ -55,5 +64,22 @@ describe('answerStep', () => {
     const summary = summarize(state);
     expect(summary).toMatchObject({ interactions: 4, quizzes: 3, correct: 2, newItems: 1, missedItemIds: [] });
     expect(summary.accuracy).toBeCloseTo(2 / 3);
+  });
+});
+
+describe('addSpeakingPractice', () => {
+  const due = (ids: string[]) => ids.map((itemId) => ({ itemId, reason: 'due' as const }));
+
+  it('follows the first quiz of speakable items, up to the limit', () => {
+    const state = addSpeakingPractice(createSession(due(['a', 'g', 'b', 'c', 'd']), always), (id) => id !== 'g', 2);
+    expect(state.steps.map((s) => `${s.itemId}:${s.mode}`)).toEqual(['a:quiz', 'a:speak', 'g:quiz', 'b:quiz', 'b:speak', 'c:quiz', 'd:quiz']);
+  });
+
+  it('never marks an item missed or re-queues it because of speaking', () => {
+    let state = addSpeakingPractice(createSession(due(['a']), always), always);
+    state = answerStep(state, { correct: true, exerciseType: 'meaning' });
+    state = answerStep(state, { correct: false, exerciseType: 'pronunciation' });
+    expect(isComplete(state)).toBe(true);
+    expect(summarize(state)).toMatchObject({ quizzes: 1, correct: 1, missedItemIds: [], spoken: 1, spokenClear: 0 });
   });
 });

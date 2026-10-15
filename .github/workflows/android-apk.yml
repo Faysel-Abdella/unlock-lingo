@@ -10,7 +10,6 @@ on:
         default: 'arm64-v8a'
         required: true
   push:
-    branches: [chore/android-apk-workflow]
     tags: ['v*']
 
 concurrency:

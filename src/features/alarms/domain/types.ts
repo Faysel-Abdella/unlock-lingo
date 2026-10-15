@@ -1,3 +1,5 @@
+import { z } from 'zod';
+
 import type { ExerciseType } from '@/types/learning';
 
 /** ISO weekday: 1 = Monday … 7 = Sunday. Stored as bit (weekday - 1) in `days_mask`. */
@@ -70,3 +72,22 @@ export function effectiveChallengeTypes(alarm: Pick<Alarm, 'challengeTypes'>): r
 
 /** The ringing service stops on its own after this long, whatever the UI does. */
 export const MAX_RING_MINUTES = 10;
+
+const weekdaySchema = z.union([z.literal(1), z.literal(2), z.literal(3), z.literal(4), z.literal(5), z.literal(6), z.literal(7)]);
+
+/** Validates alarm input from the editor before it reaches storage or the native scheduler. */
+export const alarmInputSchema = z.object({
+  label: z.string().trim().max(60),
+  hour: z.number().int().min(0).max(23),
+  minute: z.number().int().min(0).max(59),
+  days: z.array(weekdaySchema).transform((days) => [...new Set(days)].sort((a, b) => a - b)),
+  enabled: z.boolean(),
+  questionCount: z.number().int().min(QUESTION_COUNT_RANGE.min).max(QUESTION_COUNT_RANGE.max),
+  challengeTypes: z.array(z.string()).transform((types) =>
+    types.filter((t): t is ExerciseType => (ALARM_EXERCISE_TYPES as readonly string[]).includes(t)),
+  ),
+  snoozeEnabled: z.boolean(),
+  snoozeMinutes: z.number().int().min(SNOOZE_MINUTES_RANGE.min).max(SNOOZE_MINUTES_RANGE.max),
+  maxSnoozes: z.number().int().min(MAX_SNOOZES_RANGE.min).max(MAX_SNOOZES_RANGE.max),
+  vibrate: z.boolean(),
+});

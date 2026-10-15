@@ -1,6 +1,7 @@
 import type { Database } from '@/services/database/types';
 
 import { type ActivityRepository, createActivityRepository } from './activityRepository';
+import { type AlarmRepository, createAlarmRepository } from './alarmRepository';
 import { type ContentRepository, createContentRepository } from './contentRepository';
 import {
   type PersonalVocabularyRepository,
@@ -15,6 +16,7 @@ export interface Repositories {
   personal: PersonalVocabularyRepository;
   profile: ProfileRepository;
   activity: ActivityRepository;
+  alarms: AlarmRepository;
 }
 
 export function createRepositories(db: Database): Repositories {
@@ -26,7 +28,8 @@ export function createRepositories(db: Database): Repositories {
     progress: createProgressRepository(db, activity),
     personal: createPersonalVocabularyRepository(db, content),
     profile: createProfileRepository(db),
+    alarms: createAlarmRepository(db),
   };
 }
 
-export type { ActivityRepository, ContentRepository, PersonalVocabularyRepository, ProfileRepository, ProgressRepository };
+export type { ActivityRepository, AlarmRepository, ContentRepository, PersonalVocabularyRepository, ProfileRepository, ProgressRepository };

@@ -94,14 +94,22 @@ export function blankOut(sentence: string, word: string): string | null {
   return sentence.replace(pattern, BLANK);
 }
 
+/**
+ * Distractor candidates for a vocabulary item. Words related to the item in
+ * either direction (listed as its synonym/antonym, or listing it as theirs) are
+ * excluded, because they would make more than one option defensible.
+ */
 function vocabularyPool(ctx: ExerciseContext, item: VocabularyItem): VocabularyItem[] {
+  const word = normalize(item.word);
   const related = new Set([...item.synonyms, ...item.antonyms].map(normalize));
   return ctx.pool.filter(
     (p): p is VocabularyItem =>
       p.type === 'vocabulary' &&
       p.id !== item.id &&
-      normalize(p.word) !== normalize(item.word) &&
-      !related.has(normalize(p.word)),
+      normalize(p.word) !== word &&
+      !related.has(normalize(p.word)) &&
+      !p.synonyms.some((s) => normalize(s) === word) &&
+      !p.antonyms.some((a) => normalize(a) === word),
   );
 }
 

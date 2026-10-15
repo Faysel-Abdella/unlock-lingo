@@ -11,3 +11,4 @@ export { STATUS_LABEL, StatusBadge } from './StatusBadge';
 export { Text } from './Text';
 export { TextField } from './TextField';
 export { ListGroup, ListRow } from './ListRow';
+export { WHEEL_ITEM_HEIGHT, WheelPicker } from './WheelPicker';

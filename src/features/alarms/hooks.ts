@@ -106,3 +106,13 @@ export async function requestNotificationPermission(): Promise<boolean> {
   const result = await PermissionsAndroid.request(PermissionsAndroid.PERMISSIONS.POST_NOTIFICATIONS);
   return result === PermissionsAndroid.RESULTS.GRANTED;
 }
+
+/** Alarm sounds installed on the device (empty off Android). */
+export function useAlarmSounds(enabled: boolean) {
+  return useQuery({
+    queryKey: queryKeys.alarmSounds,
+    enabled: enabled && alarmClock.isAvailable,
+    queryFn: () => alarmClock.listAlarmSounds(),
+    staleTime: Infinity,
+  });
+}

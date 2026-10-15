@@ -28,6 +28,7 @@
   "devDependencies": {
     "@react-native/jest-preset": "^0.86.3",
     "@types/jest": "^29.5.14",
+    "@types/node": "^22.20.5",
     "@types/react": "~19.2.2",
     "babel-preset-expo": "~57.0.15",
     "eslint": "^9.39.5",

@@ -233,6 +233,7 @@ a new one.
 | `review_history` | Every answer with exercise type, rating, response time, context (`session`, `unlock`, `alarm`, `weekly`) and before/after scheduling state |
 | `personal_vocabulary` | My Words: links to a learning item, plus context note, source and important/difficult/mastered flags, and enrichment status |
 | `daily_activity` | Per-day counters: interactions, correct, incorrect, new, reviews, grammar, unlock cards, alarm challenges |
+| `alarms` (migration 3) | Adds `sound_uri`, `sound_title` (null = system default) and `gradual_volume` |
 | `pronunciation_attempts` | Speaking practice: expected text, what was heard, similarity and verdict (migration 2). Never affects scheduling. |
 | `weekly_stats` | One snapshot per completed weekly review (JSON, validated with Zod), keyed by week start |
 | `alarms` / `alarm_history` | Alarm definitions, and every ring: fired time, snoozes, how it was dismissed (`challenge`, `emergency`, `timeout`), questions answered/correct |
@@ -287,7 +288,10 @@ stays generated.
    (`AlarmSchedule.nextOccurrence` mirrors the TS function and has its own unit tests). A
    one-time alarm disables itself.
 3. **Ring.** `AlarmRingingService` is a foreground service of type `mediaPlayback`:
-   - plays the default alarm sound on the alarm stream (looping), vibrates and holds a wake lock;
+   - plays the alarm's sound on the alarm stream (looping): the one chosen in the editor, or the
+     system default if none was chosen or it can't be played. With gradual volume (on by default)
+     it starts at 15% and rises along a quadratic curve to full volume over 60 s. It also vibrates
+     and holds a wake lock;
    - posts a high-priority notification whose full-screen intent opens
      `unlocklingo://alarm/ring?alarmId=…`.
 
@@ -335,6 +339,10 @@ framework classes. Ringing behaviour still has to be checked on a real device (A
 - [ ] A one-time alarm turns itself off after ringing, and the app shows it as off
 - [ ] With exact alarms denied, the app warns the user and the alarm still fires (possibly late)
 - [ ] `alarm_history` shows the right dismissal method for each case
+- [ ] A chosen sound plays; deleting that ringtone falls back to the default sound
+- [ ] Gradual volume starts quiet and reaches full volume after about a minute; off = full at once
+- [ ] Sound preview in the editor stops when you leave the editor
+- [ ] The wheel time picker snaps to a value after a fling, and TalkBack adjusts it by swiping up and down
 
 ## Unlock cards
 
@@ -403,8 +411,8 @@ classes. Card delivery still has to be checked on a device:
 
 ## Roadmap
 
-- **Phase 2 follow-ups:** device testing (checklist above), custom alarm sounds, a gradual
-  volume ramp, and a wheel-style time picker.
+- **Phase 2 follow-ups:** device testing (checklist above), and custom sounds from the user's
+  own files (needs a document picker and persisted URI permissions).
 - **Phase 3 follow-ups:** device testing (checklist above), a home-screen widget as a further
   low-interruption option, and Listen directly from the notification.
 - **Phase 4 follow-ups:** prerecorded audio for seed content, a weekly-review reminder

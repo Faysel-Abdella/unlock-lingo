@@ -149,6 +149,9 @@ weekly_stats        week_start PK, snapshot(JSON), created_at                (Ph
 pronunciation_attempts  id PK, item_id, expected, heard, similarity, verdict(clear|close|unclear),
                     attempted_at                         (speaking practice; never affects FSRS)
 
+-- migration 3
+alarms              + sound_uri, sound_title (null = system default), gradual_volume
+
 alarms              id PK, label, hour, minute, days_mask(bit0=Mon), enabled, question_count,
                     challenge_types(JSON), snooze_enabled, snooze_minutes, max_snoozes, vibrate,
                     created_at, updated_at                                  (used in Phase 2)

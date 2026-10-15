@@ -58,7 +58,6 @@ export type FsrsState = 'new' | 'learning' | 'review' | 'relearning';
 
 /** FSRS rating: Again, Hard, Good, Easy. */
 export type Rating = 1 | 2 | 3 | 4;
-export const Rating = { Again: 1, Hard: 2, Good: 3, Easy: 4 } as const;
 
 export interface LearningProgress {
   itemId: string;

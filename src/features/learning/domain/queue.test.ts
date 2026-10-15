@@ -132,6 +132,11 @@ describe('buildQueue new-item rationing', () => {
     expect(queue.filter((e) => e.reason === 'new')).toHaveLength(5);
   });
 
+  it('starts with a review even when reviews are scarce', () => {
+    const queue = buildQueue([...manyDue(1), ...manyNew], opts({ size: 3, newItemsRemainingToday: 2 }));
+    expect(queue.map((e) => e.reason)).toEqual(['due', 'new', 'new']);
+  });
+
   it('spreads new items through the session instead of front-loading them', () => {
     const queue = buildQueue([...manyDue(10), ...manyNew], opts({ size: 10, maxNewRatio: 0.3 }));
     expect(queue[0]?.reason).toBe('due');

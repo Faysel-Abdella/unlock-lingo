@@ -92,19 +92,20 @@ function compareRanks(a: number[], b: number[]): number {
   return 0;
 }
 
-/** Spreads `inserts` evenly through `base`, so new items never cluster at the start. */
+/** Spreads `inserts` evenly through `base`. A base item (a review) always comes first. */
 function interleave<T>(base: T[], inserts: T[]): T[] {
   if (inserts.length === 0) return base;
   if (base.length === 0) return inserts;
   const result: T[] = [];
   const gap = (base.length + inserts.length) / inserts.length;
-  let nextInsertAt = Math.floor(gap / 2);
+  const insertPosition = (n: number) => Math.max(1, Math.floor(gap / 2 + gap * n));
+  let nextInsertAt = insertPosition(0);
   let b = 0;
   let i = 0;
   for (let pos = 0; pos < base.length + inserts.length; pos++) {
     if (i < inserts.length && (pos >= nextInsertAt || b >= base.length)) {
       result.push(inserts[i++] as T);
-      nextInsertAt = Math.floor(gap / 2 + gap * i);
+      nextInsertAt = insertPosition(i);
     } else {
       result.push(base[b++] as T);
     }

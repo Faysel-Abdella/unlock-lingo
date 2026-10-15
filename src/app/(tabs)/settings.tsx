@@ -145,10 +145,19 @@ function SettingsForm({ settings, profile }: { settings: AppSettings; profile: U
         </SettingRow>
       </Card>
 
-      <SectionHeader title="Alarms" />
+      <SectionHeader title="Daily moments" />
       <Card onPress={() => router.push('/alarms')} accessibilityLabel="Manage alarms">
         <Text variant="bodyStrong">Learn-to-dismiss alarms</Text>
         <Text tone="muted">Create alarms, choose how many questions stop them, and check alarm permissions.</Text>
+      </Card>
+
+      <Card onPress={() => router.push('/unlock-settings')} accessibilityLabel="Unlock learning settings">
+        <Text variant="bodyStrong">Unlock learning</Text>
+        <Text tone="muted">
+          {settings.unlock.enabled
+            ? `On · up to ${settings.unlock.maxCardsPerDay} cards a day, ${settings.unlock.cooldownMinutes} min apart`
+            : 'Off · small cards after you unlock your phone'}
+        </Text>
       </Card>
 
       <SectionHeader title="Audio" />

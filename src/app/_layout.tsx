@@ -1,16 +1,15 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { Stack } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
-import { SQLiteProvider } from 'expo-sqlite';
 import { StatusBar } from 'expo-status-bar';
-import { Suspense, useEffect } from 'react';
+import { useEffect } from 'react';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 import { AlarmRuntime } from '@/features/alarms/AlarmRuntime';
 import { useProfile, useSettings } from '@/features/settings/hooks';
 import { UnlockRuntime } from '@/features/unlock/UnlockRuntime';
 import { RepositoriesProvider } from '@/hooks/useRepositories';
-import { DATABASE_NAME, initializeDatabase } from '@/services/database/initialize';
+import { DatabaseProvider } from '@/services/database/DatabaseProvider';
 import { ThemeProvider, useTheme } from '@/theme/ThemeProvider';
 
 export { ErrorBoundary } from 'expo-router';
@@ -27,15 +26,13 @@ const queryClient = new QueryClient({
 export default function RootLayout() {
   return (
     <SafeAreaProvider>
-      <Suspense fallback={null}>
-        <SQLiteProvider databaseName={DATABASE_NAME} onInit={initializeDatabase} useSuspense>
-          <QueryClientProvider client={queryClient}>
-            <RepositoriesProvider>
-              <AppShell />
-            </RepositoriesProvider>
-          </QueryClientProvider>
-        </SQLiteProvider>
-      </Suspense>
+      <DatabaseProvider>
+        <QueryClientProvider client={queryClient}>
+          <RepositoriesProvider>
+            <AppShell />
+          </RepositoriesProvider>
+        </QueryClientProvider>
+      </DatabaseProvider>
     </SafeAreaProvider>
   );
 }

@@ -1,13 +1,13 @@
-import { useSQLiteContext } from 'expo-sqlite';
 import { createContext, type ReactNode, useContext, useMemo } from 'react';
 
 import { type Repositories, createRepositories } from '@/repositories';
+import { useDatabase } from '@/services/database/DatabaseContext';
 
 const RepositoriesContext = createContext<Repositories | null>(null);
 
-/** Must be rendered inside `SQLiteProvider`. */
+/** Must be rendered inside `DatabaseProvider`. */
 export function RepositoriesProvider({ children }: { children: ReactNode }) {
-  const db = useSQLiteContext();
+  const db = useDatabase();
   const repos = useMemo(() => createRepositories(db), [db]);
   return <RepositoriesContext.Provider value={repos}>{children}</RepositoriesContext.Provider>;
 }

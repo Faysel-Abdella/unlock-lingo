@@ -1,4 +1,6 @@
-import { describeLevelMix, difficultyStatus, levelAccuracy, reviewsUntilAdaptive, trendOf, weeklyTrends } from './analytics';
+import { emptyDay } from '@/features/learning/domain/stats';
+
+import { describeLevelMix, longRangeStart, weeklyBuckets, difficultyStatus, levelAccuracy, reviewsUntilAdaptive, trendOf, weeklyTrends } from './analytics';
 
 const week = (start: string, accuracy: number | null) => ({ week: { start, end: start }, wordsEncountered: 10, accuracy });
 
@@ -35,5 +37,27 @@ describe('level analytics', () => {
     expect(difficultyStatus({ shares: { B1: 0.75, B2: 0.25 }, suggestedLevel: null }, b1(40), 'B1')).toEqual({ kind: 'mixing' });
     expect(difficultyStatus({ shares: { B1: 1 }, suggestedLevel: null }, b1(12), 'B1')).toEqual({ kind: 'gathering', level: 'B1', needed: 18 });
     expect(difficultyStatus({ shares: { B1: 1 }, suggestedLevel: null }, b1(40), 'B1')).toEqual({ kind: 'steady', level: 'B1' });
+  });
+});
+
+describe('weeklyBuckets', () => {
+  // 2026-03-11 is a Wednesday.
+  it('starts on the Monday of the earliest week', () => {
+    expect(longRangeStart('2026-03-11', 1)).toBe('2026-03-09');
+    expect(longRangeStart('2026-03-09', 3)).toBe('2026-02-23');
+    expect(longRangeStart('2026-03-15', 1)).toBe('2026-03-09');
+  });
+
+  it('sums each calendar week and counts active days', () => {
+    const days = [
+      { ...emptyDay('2026-03-02'), interactions: 4, correct: 3, incorrect: 1 },
+      { ...emptyDay('2026-03-08'), interactions: 2, correct: 2 },
+      { ...emptyDay('2026-03-10'), interactions: 5, correct: 1, incorrect: 4 },
+    ];
+    expect(weeklyBuckets(days, '2026-03-11', 3)).toEqual([
+      { start: '2026-02-23', interactions: 0, correct: 0, incorrect: 0, activeDays: 0 },
+      { start: '2026-03-02', interactions: 6, correct: 5, incorrect: 1, activeDays: 2 },
+      { start: '2026-03-09', interactions: 5, correct: 1, incorrect: 4, activeDays: 1 },
+    ]);
   });
 });

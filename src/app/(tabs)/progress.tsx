@@ -1,13 +1,15 @@
 import { router } from 'expo-router';
+import { useState } from 'react';
 import { View } from 'react-native';
 
 import { Card, Chip, ListGroup, ListRow, ProgressBar, Screen, SectionHeader, StatGrid, Text } from '@/components';
 import { accuracy } from '@/features/learning/domain/stats';
 import { useProgressOverview } from '@/features/learning/hooks';
-import { WeekChart } from '@/features/progress/WeekChart';
+import { WeekChart, WeeksChart } from '@/features/progress/WeekChart';
 import {
   type DifficultyStatus,
   type Trend,
+  type WeekBucket,
   describeLevelMix,
   difficultyStatus,
   levelAccuracy,
@@ -36,6 +38,7 @@ export default function ProgressScreen() {
   const history = useWeeklyHistory().data ?? [];
   const goal = useSettings().data?.dailyGoal ?? 10;
   const currentLevel = useProfile().data?.currentLevel;
+  const [range, setRange] = useState<'week' | 'weeks'>('week');
   if (!data) return <Screen>{null}</Screen>;
 
   const today = data.week[data.week.length - 1];
@@ -46,10 +49,17 @@ export default function ProgressScreen() {
       <Text variant="title">Progress</Text>
 
       <Card>
-        <Text variant="label" tone="subtle">
-          Last 7 days
-        </Text>
-        <WeekChart days={data.week} goal={goal} />
+        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.sm }}>
+          <Text variant="label" tone="subtle">
+            {range === 'week' ? 'Last 7 days' : `Last ${data.recentWeeks.length} weeks`}
+          </Text>
+          <View style={{ flexDirection: 'row', gap: spacing.xs }}>
+            <Chip label="7 days" selected={range === 'week'} onPress={() => setRange('week')} />
+            <Chip label="12 weeks" selected={range === 'weeks'} onPress={() => setRange('weeks')} />
+          </View>
+        </View>
+        {range === 'week' ? <WeekChart days={data.week} goal={goal} /> : <WeeksChart weeks={data.recentWeeks} goal={goal} />}
+        {range === 'weeks' ? <LongRangeSummary weeks={data.recentWeeks} /> : null}
       </Card>
 
       <StatGrid
@@ -172,4 +182,22 @@ function difficultyExplanation(status: DifficultyStatus): string {
     case 'steady':
       return `Keep your ${status.level} accuracy above 85% and the next level is mixed in gradually.`;
   }
+}
+
+function LongRangeSummary({ weeks }: { weeks: WeekBucket[] }) {
+  const total = weeks.reduce(
+    (sum, w) => ({
+      interactions: sum.interactions + w.interactions,
+      correct: sum.correct + w.correct,
+      incorrect: sum.incorrect + w.incorrect,
+      activeDays: sum.activeDays + w.activeDays,
+    }),
+    { interactions: 0, correct: 0, incorrect: 0, activeDays: 0 },
+  );
+  return (
+    <Text variant="caption" tone="muted">
+      {total.interactions} moments · {percent(accuracy(total.correct, total.incorrect))} correct · {total.activeDays} active{' '}
+      {total.activeDays === 1 ? 'day' : 'days'}
+    </Text>
+  );
 }

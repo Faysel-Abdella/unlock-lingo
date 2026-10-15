@@ -1,40 +1,36 @@
-import { View } from 'react-native';
-
-import { Text } from '@/components';
 import type { DailyActivity } from '@/features/learning/domain/stats';
-import { useTheme } from '@/theme/ThemeProvider';
-import { weekdayShort } from '@/utils/date';
+import type { WeekBucket } from '@/features/progress/domain/analytics';
+import { parseDateKey, weekdayShort } from '@/utils/date';
 
-/** Seven-day activity bars. Deliberately simple: counts, no scores or badges. */
+import { BarChart } from './BarChart';
+
+/** Seven-day activity bars, with the daily goal as the minimum scale. */
 export function WeekChart({ days, goal }: { days: DailyActivity[]; goal: number }) {
-  const { colors, radius, spacing } = useTheme();
-  const max = Math.max(goal, ...days.map((d) => d.interactions), 1);
-  const height = 120;
   return (
-    <View
-      accessible
+    <BarChart
+      minMax={goal}
       accessibilityLabel={`Last 7 days: ${days.map((d) => `${weekdayShort(d.date)} ${d.interactions}`).join(', ')}`}
-      style={{ flexDirection: 'row', alignItems: 'flex-end', gap: spacing.sm, height: height + 24 }}
-    >
-      {days.map((d, i) => {
-        const isToday = i === days.length - 1;
-        const barHeight = Math.max(4, (d.interactions / max) * height);
-        return (
-          <View key={d.date} style={{ flex: 1, alignItems: 'center', gap: spacing.xs }}>
-            <View
-              style={{
-                width: '100%',
-                height: barHeight,
-                borderRadius: radius.sm,
-                backgroundColor: d.interactions === 0 ? colors.surfaceMuted : isToday ? colors.accent : colors.accentSoft,
-              }}
-            />
-            <Text variant="caption" tone={isToday ? 'default' : 'subtle'}>
-              {weekdayShort(d.date)}
-            </Text>
-          </View>
-        );
-      })}
-    </View>
+      bars={days.map((d, i) => ({ key: d.date, label: weekdayShort(d.date), value: d.interactions, current: i === days.length - 1 }))}
+    />
+  );
+}
+
+function shortDate(key: string): string {
+  return parseDateKey(key).toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+}
+
+/** Weekly totals over a longer period; every third week is labelled to keep the axis readable. */
+export function WeeksChart({ weeks, goal }: { weeks: WeekBucket[]; goal: number }) {
+  return (
+    <BarChart
+      minMax={goal * 7}
+      accessibilityLabel={`Last ${weeks.length} weeks: ${weeks.map((w) => `week of ${shortDate(w.start)} ${w.interactions}`).join(', ')}`}
+      bars={weeks.map((w, i) => ({
+        key: w.start,
+        label: (weeks.length - 1 - i) % 3 === 0 ? shortDate(w.start) : '',
+        value: w.interactions,
+        current: i === weeks.length - 1,
+      }))}
+    />
   );
 }

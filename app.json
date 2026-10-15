@@ -40,6 +40,12 @@
             "backgroundColor": "#121413"
           }
         }
+      ],
+      [
+        "expo-notifications",
+        {
+          "color": "#0F766E"
+        }
       ]
     ],
     "web": {

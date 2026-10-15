@@ -21,6 +21,11 @@ export const appSettingsSchema = z.object({
   autoPlayAudio: setting(z.boolean(), false),
   /** 0 = Sunday … 6 = Saturday. */
   weeklyReviewDay: setting(z.number().int().min(0).max(6), 0),
+  /** Notification on the review day when the weekly review is ready. Off until the learner opts in. */
+  weeklyReminder: setting(
+    z.object({ enabled: z.boolean(), hour: z.number().int().min(0).max(23), minute: z.number().int().min(0).max(59) }),
+    { enabled: false, hour: 18, minute: 0 },
+  ),
   /** Unlock learning cards. Falls back to safe defaults (off) if stored data is invalid. */
   unlock: setting(unlockSettingsSchema, DEFAULT_UNLOCK_SETTINGS),
 });

@@ -204,3 +204,20 @@ describe('activity repository', () => {
     close();
   });
 });
+
+describe('unlock settings', () => {
+  it('defaults to off and falls back to defaults when stored data is invalid', async () => {
+    const { repos, close } = await setup();
+    const settings = await repos.profile.getSettings();
+    expect(settings.unlock).toMatchObject({ enabled: false, maxCardsPerDay: 10, cooldownMinutes: 30 });
+
+    const next = await repos.profile.updateSettings({ unlock: { ...settings.unlock, enabled: true, maxCardsPerDay: 5 } });
+    expect(next.unlock).toMatchObject({ enabled: true, maxCardsPerDay: 5 });
+    expect((await repos.profile.getSettings()).unlock.maxCardsPerDay).toBe(5);
+
+    // A corrupt value (here: 0 card types and 999 cards) never reaches the policy.
+    const corrupt = { ...next.unlock, maxCardsPerDay: 999, cardTypes: [] };
+    expect((await repos.profile.updateSettings({ unlock: corrupt })).unlock).toMatchObject({ enabled: false, maxCardsPerDay: 10 });
+    close();
+  });
+});
